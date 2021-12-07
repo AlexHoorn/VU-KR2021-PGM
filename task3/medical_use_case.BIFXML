@@ -176,7 +176,7 @@
 
 <DEFINITION>
     <FOR>Depression</FOR>
-    <GIVEN>Weight gain</GIVEN>
+    <GIVEN>Weight-gain</GIVEN>
     <GIVEN>Anxiety</GIVEN>
     <GIVEN>High-blood-pressure</GIVEN>
     <TABLE>0.99 0.01 0.42 0.58 0.17 0.83 0.05 0.95 0.90 0.10 0.22 0.78 0.1 0.9 0.55 0.45</TABLE> 
