@@ -22,138 +22,172 @@
 
 <BIF VERSION="0.3">
 <NETWORK>
-    <NAME>Medical use case</NAME>
+<NAME>Medical-use-case</NAME>
 
-    <!-- Variables-->
-    <VARIABLE TYPE="nature">
-        <NAME>Junk Food</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-    <VARIABLE TYPE="nature">
-        <NAME>Stress</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-    <VARIABLE TYPE="nature">
-        <NAME>Job loss</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-    <VARIABLE TYPE="nature">
-        <NAME>Weight gain</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-    <VARIABLE TYPE="nature">
-        <NAME>Insulin resistance</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-    <VARIABLE TYPE="nature">
-        <NAME>Anxiety</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-    <VARIABLE TYPE="nature">
-        <NAME>High blood pressure</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-        <VARIABLE TYPE="nature">
-        <NAME>Alcohol consumption</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-    </VARIABLE>
-        <VARIABLE TYPE="nature">
-        <NAME>Trauma</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-        <VARIABLE TYPE="nature">
-        <NAME>Diabetes</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-        <VARIABLE TYPE="nature">
-        <NAME>Depression</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
-        <VARIABLE TYPE="nature">
-        <NAME>Stroke</NAME>
-        <OUTCOME>True</OUTCOME>
-        <OUTCOME>False</OUTCOME>
-    </VARIABLE>
+<!-- Variables-->
+<VARIABLE TYPE="nature">
+    <NAME>Junk-Food</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (73, 165)</PROPERTY>
+</VARIABLE>
 
-    <!-- PCTs -->
-    <DEFINITION>
-        <FOR>Junk Food</FOR>
-        <TABLE>0.5 0.5</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Stress</FOR>
-        <TABLE>0.4 0.6</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Job loss</FOR>
-        <TABLE>0.2 0.8</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Weight gain</FOR>
-        <GIVEN>Junk Food</GIVEN>
-        <GIVEN>Stress</GIVEN>
-        <TABLE>0.95 0.05 0.9 0.1 0.8 0.2 0.00 1.00</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Insulin resistance</FOR>
-        <GIVEN>Junk Food</GIVEN>
-        <GIVEN>Weight gain</GIVEN>
-        <TABLE>0.98 0.02 0.01 0.99 0.03 0.97 0.12 0.88</TABLE> 
-    </DEFINITION>
-       <DEFINITION>
-        <FOR>Anxiety</FOR>
-        <GIVEN>Junk Food</GIVEN>
-        <GIVEN>Stress</GIVEN>
-        <TABLE>0.78 0.22 0.13 0.87 0.31 0.69 0.02 0.98</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>High blood pressure</FOR>
-        <GIVEN>Anxiety</GIVEN>
-        <GIVEN>Stress</GIVEN>
-        <TABLE>0.94 0.06 0.22 0.78 0.03 0.97 0.10 0.90</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Alcohol consumption</FOR>
-        <GIVEN>Stress</GIVEN>
-        <GIVEN>Job loss</GIVEN>
-        <TABLE>1.0 0.0 0.2 0.8 0.1 0.9 0.05 0.95</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Trauma</FOR>
-        <GIVEN>Alcohol consumption</GIVEN>
-        <GIVEN>Stress</GIVEN>
-        <TABLE>0.20 0.80 0.3 0.7 0.12 0.88 0.05 0.95</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Diabetes</FOR>
-        <GIVEN>Insulin resistance</GIVEN>
-        <GIVEN>High blood pressure</GIVEN>
-        <TABLE>0.14 0.86 0.21 0.79 0.16 0.84 0.15 0.85</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Depression</FOR>
-        <GIVEN>Weight gain</GIVEN>
-        <GIVEN>Anxiety</GIVEN>
-        <GIVEN>High blood pressure</GIVEN>
-        <TABLE>0.99 0.01 0.42 0.58 0.17 0.83 0.05 0.95 0.90 0.10 0.22 0.78 0.1 0.9 0.55 0.45</TABLE> 
-    </DEFINITION>
-    <DEFINITION>
-        <FOR>Stroke</FOR>
-        <GIVEN>High blood pressure</GIVEN>
-        <GIVEN>Trauma</GIVEN>
-        <TABLE>0.75 0.25 0.12 0.88 0.15 0.85 0.25 0.75</TABLE>
-    </DEFINITION>
+<VARIABLE TYPE="nature">
+    <NAME>Stress</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (190, 69)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Job-loss</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (155, 165)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Weight-gain</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (154, 241)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Insulin-resistance</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (112, 69)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Anxiety</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (122, 69)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>High-blood-pressure</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (112, 81)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Alcohol-consumption</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (132, 79)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Trauma</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (142, 55)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Diabetes</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (172, 81)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Depression</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (172, 62)</PROPERTY>
+</VARIABLE>
+
+<VARIABLE TYPE="nature">
+    <NAME>Stroke</NAME>
+    <OUTCOME>True</OUTCOME>
+    <OUTCOME>False</OUTCOME>
+    <PROPERTY>position = (133, 74)</PROPERTY>
+</VARIABLE>
+
+<!-- Probability distributions -->
+<DEFINITION>
+    <FOR>Junk-Food</FOR>
+    <TABLE>0.5 0.5</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Stress</FOR>
+    <TABLE>0.4 0.6</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Job-loss</FOR>
+    <TABLE>0.2 0.8</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Weight-gain</FOR>
+    <GIVEN>Junk-Food</GIVEN>
+    <GIVEN>Stress</GIVEN>
+    <TABLE>0.95 0.05 0.9 0.1 0.8 0.2 0.00 1.00</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Insulin-resistance</FOR>
+    <GIVEN>Junk-Food</GIVEN>
+    <GIVEN>Weight-gain</GIVEN>
+    <TABLE>0.98 0.02 0.01 0.99 0.03 0.97 0.12 0.88</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Anxiety</FOR>
+    <GIVEN>Junk-Food</GIVEN>
+    <GIVEN>Stress</GIVEN>
+    <TABLE>0.78 0.22 0.13 0.87 0.31 0.69 0.02 0.98</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>High-blood-pressure</FOR>
+    <GIVEN>Anxiety</GIVEN>
+    <GIVEN>Stress</GIVEN>
+    <TABLE>0.94 0.06 0.22 0.78 0.03 0.97 0.10 0.90</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Alcohol-consumption</FOR>
+    <GIVEN>Stress</GIVEN>
+    <GIVEN>Job-loss</GIVEN>
+    <TABLE>1.0 0.0 0.2 0.8 0.1 0.9 0.05 0.95</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Trauma</FOR>
+    <GIVEN>Alcohol-consumption</GIVEN>
+    <GIVEN>Stress</GIVEN>
+    <TABLE>0.20 0.80 0.3 0.7 0.12 0.88 0.05 0.95</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Diabetes</FOR>
+    <GIVEN>Insulin-resistance</GIVEN>
+    <GIVEN>High-blood-pressure</GIVEN>
+    <TABLE>0.14 0.86 0.21 0.79 0.16 0.84 0.15 0.85</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Depression</FOR>
+    <GIVEN>Weight-gain</GIVEN>
+    <GIVEN>Anxiety</GIVEN>
+    <GIVEN>High-blood-pressure</GIVEN>
+    <TABLE>0.99 0.01 0.42 0.58 0.17 0.83 0.05 0.95 0.90 0.10 0.22 0.78 0.1 0.9 0.55 0.45</TABLE> 
+</DEFINITION>
+
+<DEFINITION>
+    <FOR>Stroke</FOR>
+    <GIVEN>High-blood-pressure</GIVEN>
+    <GIVEN>Trauma</GIVEN>
+    <TABLE>0.75 0.25 0.12 0.88 0.15 0.85 0.25 0.75</TABLE>
+</DEFINITION>
+
 </NETWORK>
 </BIF>
