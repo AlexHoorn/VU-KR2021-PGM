@@ -86,7 +86,7 @@ class BNReasoner:
 
 
 
-    def pruning(self, Q: List[str], E: pd.Series) -> BayesNet:
+    def pruning(self, Q: List[str], E: pd.Series) -> None:
 
         ## first prune the leaves
 
@@ -134,6 +134,6 @@ class BNReasoner:
         # and adjust the CPTs
 
         #??
-
-
-        return self
+        for i in range(0, len(E.index)):
+            newcpt = self.reduce_factor(E, self.get_cpt(E.index[i]))
+            self.update_cpt(E.index[i], newcpt)
