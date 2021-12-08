@@ -4,7 +4,7 @@ from typing import Dict, List, Union
 from networkx.classes.graph import Graph
 
 from BayesNet import BayesNet
-
+import pandas as pd
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]) -> None:
@@ -83,3 +83,57 @@ class BNReasoner:
             adjacency[v].discard(node)
 
         del adjacency[node]
+
+
+
+    def pruning(self, Q: List[str], E: pd.Series) -> BayesNet:
+
+        ## first prune the leaves
+
+        #Q = ['Winter?', 'Sprinkler?']
+        #E = pd.Series({'Winter?': True, 'Sprinkler?': False})
+
+        # combined set of states
+        L = Q
+        for i in range(0, len(E.index)):
+            if E.index[i] not in L:
+                L.append(E.index[i])
+
+        # repeat this as often as possible
+        simpl = True
+
+        while(simpl):
+
+            V = self.get_all_variables()
+            count = 0
+
+            for i in range(len(V)):
+
+                if len(V) == len(L):
+                    simpl = False
+                if V[i] not in L:
+                    if len(self.get_children(V[i]) == 0):
+                        self.del_var(V[i])
+                        count += 1
+            
+            if count == 0:
+                simpl = False
+                
+        
+        ## than prune the edges
+        L = []
+
+        for i in range(0, len(E.index)):
+            L.append(E.index[i])
+
+        for node in L:
+            childs = self.get_children(node)
+            for child in childs:
+                self.del_edge([node, child])
+
+        # and adjust the CPTs
+
+        #??
+
+
+        return self
