@@ -104,7 +104,7 @@ class BNReasoner:
 
         while(simpl):
 
-            V = self.get_all_variables()
+            V = self.bn.get_all_variables()
             count = 0
 
             for i in range(len(V)):
@@ -112,8 +112,8 @@ class BNReasoner:
                 if len(V) == len(L):
                     simpl = False
                 if V[i] not in L:
-                    if len(self.get_children(V[i]) == 0):
-                        self.del_var(V[i])
+                    if len(self.bn.get_children(V[i]) == 0):
+                        self.bn.del_var(V[i])
                         count += 1
             
             if count == 0:
@@ -127,13 +127,13 @@ class BNReasoner:
             L.append(E.index[i])
 
         for node in L:
-            childs = self.get_children(node)
+            childs = self.bn.get_children(node)
             for child in childs:
-                self.del_edge([node, child])
+                self.bn.del_edge([node, child])
 
         # and adjust the CPTs
 
         #??
         for i in range(0, len(E.index)):
-            newcpt = self.reduce_factor(E, self.get_cpt(E.index[i]))
-            self.update_cpt(E.index[i], newcpt)
+            newcpt = self.bn.reduce_factor(E, self.get_cpt(E.index[i]))
+            self.bn.update_cpt(E.index[i], newcpt)
