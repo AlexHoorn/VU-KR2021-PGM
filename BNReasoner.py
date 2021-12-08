@@ -90,8 +90,9 @@ class BNReasoner:
 
         ## first prune the leaves
 
-        #Q = ['Winter?', 'Sprinkler?']
-        #E = pd.Series({'Winter?': True, 'Sprinkler?': False})
+        # Q = ['Wet Grass?']
+        # E = pd.Series({'Winter?': True, 'Rain?': False})
+        # bn.pruning(["Wet Grass?"], pd.Series({'Winter?': True, 'Rain?': False}))
 
         # combined set of states
         L = Q
@@ -107,12 +108,12 @@ class BNReasoner:
             V = self.bn.get_all_variables()
             count = 0
 
-            for i in range(len(V)):
+            if len(V) == len(L):
+                simpl = False
 
-                if len(V) == len(L):
-                    simpl = False
+            for i in range(len(V)):
                 if V[i] not in L:
-                    if len(self.bn.get_children(V[i]) == 0):
+                    if len(self.bn.get_children(V[i])) == 0:
                         self.bn.del_var(V[i])
                         count += 1
             
@@ -135,5 +136,5 @@ class BNReasoner:
 
         #??
         for i in range(0, len(E.index)):
-            newcpt = self.bn.reduce_factor(E, self.get_cpt(E.index[i]))
+            newcpt = self.bn.reduce_factor(E, self.bn.get_cpt(E.index[i]))
             self.bn.update_cpt(E.index[i], newcpt)
