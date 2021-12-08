@@ -121,20 +121,23 @@ class BNReasoner:
                 simpl = False
                 
         
-        ## than prune the edges
+        # adjust the CPTs
         L = []
-
         for i in range(0, len(E.index)):
             L.append(E.index[i])
 
+        for i, node in enumerate(L):
+            childs = self.bn.get_children(node)
+            for child in childs:
+                # only parent instantiation
+                newcpt = self.bn.get_compatible_instantiations_table(E.take([i]), self.bn.get_cpt(child))
+                # all instantiations
+                # newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(child))
+                self.bn.update_cpt(child, newcpt)
+
+        # then prune the edges
         for node in L:
             childs = self.bn.get_children(node)
             for child in childs:
                 self.bn.del_edge([node, child])
 
-        # and adjust the CPTs
-
-        #??
-        for i in range(0, len(E.index)):
-            newcpt = self.bn.reduce_factor(E, self.bn.get_cpt(E.index[i]))
-            self.bn.update_cpt(E.index[i], newcpt)
