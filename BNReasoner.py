@@ -183,6 +183,8 @@ class BNReasoner:
             probabilities = (
                 probabilities.groupby(variables).agg({"p": "sum"}).reset_index()
             )
+        else:
+            variables = self.bn.get_all_variables()
 
         if evidence is not None:
             # Make sure we can query given evidence
