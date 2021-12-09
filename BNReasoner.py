@@ -1,10 +1,11 @@
-from itertools import combinations
-from typing import Dict, List, Union
+from itertools import combinations, product
+from typing import Dict, List, Optional, Union
 
+import pandas as pd
 from networkx.classes.graph import Graph
 
 from BayesNet import BayesNet
-import pandas as pd
+
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]) -> None:
@@ -84,8 +85,6 @@ class BNReasoner:
 
         del adjacency[node]
 
-
-
     def pruning(self, Q: List[str], E: pd.Series) -> None:
 
         ## first prune the leaves
@@ -120,7 +119,6 @@ class BNReasoner:
             if count == 0:
                 simpl = False
                 
-        
         # adjust the CPTs
         L = []
         for i in range(0, len(E.index)):
@@ -141,3 +139,59 @@ class BNReasoner:
             for child in childs:
                 self.bn.del_edge([node, child])
 
+    def joint_probability(self) -> pd.DataFrame:
+        """Get the truth table with probabilities by chain rule"""
+        # TODO: Perhaps make vars queryable to improve performance
+        variables = self.bn.get_all_variables()
+
+        # DataFrame with combinations of True and False per var
+        truth_table = pd.DataFrame(
+            product([True, False], repeat=len(variables)), columns=variables
+        )
+
+        for i, col in enumerate(truth_table):
+            j = self.bn.get_cpt(col)
+            # Determine what columns to merge on
+            j_cols = j.columns
+            j_cols = list(j_cols[j_cols != "p"])
+            # Merge truth table with probabilities
+            truth_table = truth_table.merge(j, on=j_cols)
+            # Rename column with probability
+            truth_table.rename({"p": f"p_{i}"}, inplace=True, axis=1)
+
+        # Determine what columns have probabilities
+        p_cols = [col for col in truth_table.columns if col.startswith("p_")]
+
+        # Multiply all probabilities
+        truth_table["p"] = 1
+        for col in p_cols:
+            truth_table["p"] = truth_table["p"] * truth_table[col]
+
+        truth_table.drop(p_cols, axis=1, inplace=True)
+
+        return truth_table
+
+    def marginal_distribution(
+        self,
+        variables: Optional[List[str]] = None,
+        evidence: Optional[Dict[str, bool]] = None,
+    ) -> pd.DataFrame:
+        probabilities = self.joint_probability()
+
+        # If we only want specific vars then sum over all others
+        if variables is not None:
+            probabilities = (
+                probabilities.groupby(variables).agg({"p": "sum"}).reset_index()
+            )
+
+        if evidence is not None:
+            # Make sure we can query given evidence
+            for v in evidence:
+                assert v in variables, f"evidence '{v}' not in {variables}"
+
+            # Using pandas query and a query string
+            # e.g. '`Winter?` == True and `Wet Grass?` == False'
+            queries = [f"`{v}` == {e}" for v, e in evidence.items()]
+            return probabilities.query(" and ".join(queries))
+
+        return probabilities
