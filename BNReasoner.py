@@ -1,9 +1,12 @@
+#from _typeshed import Self
+from copy import deepcopy
 from itertools import combinations, product
 from typing import Dict, List, Optional, Union
+from networkx.algorithms.shortest_paths.generic import has_path
 
 import pandas as pd
 from networkx.classes.graph import Graph
-
+import networkx as nx
 from BayesNet import BayesNet
 
 
@@ -23,6 +26,31 @@ class BNReasoner:
             raise TypeError("net must be of type `str` or `BayesNet`")
 
     # TODO: This is where your methods should go
+    def d_sep_wrong(self, Xset, Ev, Yset,) -> bool: 
+        for x in Xset:
+            for y in Yset:
+                print(x)
+                paths = list(nx.all_shortest_paths(self.bn.get_interaction_graph(), x,y))
+                for path in paths:
+                    print(path)
+                    if BNReasoner.block(path, Ev) == False:
+                        return False
+        return True
+    
+    def block_wrong(self, p, Ev,) -> bool:
+        for step in range(0,len(p)-2):
+            if (p[step+1] in self.bn.get_children(p[step]) and p[step+2] in self.bn.get_children(p[step+1])):
+                if p[step+1] not in Ev:
+                    return False
+            #converging valve
+            if p[step+1] in self.bn.get_children(p[step]) and p[step+1] in self.bn.get_children(p[step+2]):
+                if p[step+1] in Ev or nx.descendants(p[step+1]) in Ev:
+                    return False
+            #diverging valve
+            if p[step] in self.bn.get_children(p[step+1]) and p[step+2] in self.bn.get_children(p[step+1]):
+                return False
+        return True 
+
     def order(self, heuristic="mindeg", ascending=True) -> List[str]:
         adjacency = self.adjacency(self.bn.get_interaction_graph())
         order = []
@@ -197,3 +225,39 @@ class BNReasoner:
             return probabilities.query(" and ".join(queries))
 
         return probabilities
+
+    def d_separation_with_pruning(self, X, Z, Y):
+        # copy the graph 
+        P = deepcopy(self)
+
+        # delete leaf nodes
+        deletion = True
+
+        while deletion == True:
+            count = 0
+            V = P.bn.get_all_variables()
+            for i in range(len(V)):
+                if V[i] not in X and V[i] not in Y and V[i] not in Z:
+                    if len(P.bn.get_children(V[i])) == 0:
+                            P.bn.del_var(V[i])
+                            count += 1
+           # print('after deleting leaf nodes: '+ str(P.bn.get_all_variables()))
+            if count == 0:
+                deletion = False
+
+
+        # delete outgoing edges from Z
+        for var in Z:
+            childs = P.bn.get_children(var)
+            for child in childs:
+                P.bn.del_edge([var, child])
+
+        #check for every node in X and Y if there is a connection (connection = )
+        # if so, X and Y are not d-separated by Z
+
+        for x in X:
+            for y in Y:
+               if nx.has_path(nx.to_undirected(P.bn.structure), x,y):
+                    return False
+        return True
+    
