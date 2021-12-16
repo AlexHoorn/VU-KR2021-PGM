@@ -51,8 +51,16 @@ class BNReasoner:
                 return False
         return True 
 
-    def order(self, heuristic="mindeg", ascending=True) -> List[str]:
-        adjacency = self.adjacency(self.bn.get_interaction_graph())
+    def order(self, X=None, heuristic="mindeg", ascending=True) -> List[str]:
+        G = self.bn.get_interaction_graph()
+        all_nodes = self.bn.get_all_variables()
+
+        if X is not None:
+            for node in all_nodes:
+                if node not in X:
+                    G.remove_node(node)
+
+        adjacency = self.adjacency(G)
         order = []
 
         # Check whether given heuristic is valid
@@ -201,27 +209,27 @@ class BNReasoner:
 
     def marginal_distribution(
         self,
-        variables: Optional[List[str]] = None,
-        evidence: Optional[Dict[str, bool]] = None,
+        Q: Optional[List[str]] = None,
+        E: Optional[Dict[str, bool]] = None,
     ) -> pd.DataFrame:
         probabilities = self.joint_probability()
 
         # If we only want specific vars then sum over all others
-        if variables is not None:
+        if Q is not None:
             probabilities = (
-                probabilities.groupby(variables).agg({"p": "sum"}).reset_index()
+                probabilities.groupby(Q).agg({"p": "sum"}).reset_index()
             )
         else:
-            variables = self.bn.get_all_variables()
+            Q = self.bn.get_all_variables()
 
-        if evidence is not None:
+        if E is not None:
             # Make sure we can query given evidence
-            for v in evidence:
-                assert v in variables, f"evidence '{v}' not in {variables}"
+            for v in E:
+                assert v in Q, f"evidence '{v}' not in {Q}"
 
             # Using pandas query and a query string
             # e.g. '`Winter?` == True and `Wet Grass?` == False'
-            queries = [f"`{v}` == {e}" for v, e in evidence.items()]
+            queries = [f"`{v}` == {e}" for v, e in E.items()]
             return probabilities.query(" and ".join(queries))
 
         return probabilities
