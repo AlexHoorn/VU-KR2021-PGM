@@ -122,36 +122,25 @@ class BNReasoner:
         del adjacency[node]
 
     def pruning(self, Q: List[str], E: pd.Series) -> None:
-
-        ## first prune the leaves
-
-        # Q = ['Wet Grass?']
-        # E = pd.Series({'Winter?': True, 'Rain?': False})
-        # bn.pruning(["Wet Grass?"], pd.Series({'Winter?': True, 'Rain?': False}))
+        ## prune a network for a given query and evidence set as far as possible
 
         # combined set of states
-        L = Q
+        L = deepcopy(Q)
         for i in range(0, len(E.index)):
             if E.index[i] not in L:
                 L.append(E.index[i])
 
+        # first prune the leaves
         # repeat this as often as possible
         simpl = True
-
         while(simpl):
-
             V = self.bn.get_all_variables()
             count = 0
-
-            if len(V) == len(L):
-                simpl = False
-
             for i in range(len(V)):
                 if V[i] not in L:
                     if len(self.bn.get_children(V[i])) == 0:
                         self.bn.del_var(V[i])
                         count += 1
-            
             if count == 0:
                 simpl = False
                 
@@ -168,7 +157,7 @@ class BNReasoner:
                 # all instantiations
                 newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(child))
                 self.bn.update_cpt(child, newcpt)
-            # simplify also all CPTs of the evidenz itself
+            # simplify also all CPTs of the evidenz itself --> STATE THAT IN THE REPORT MAYBE?
             newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(node))
             self.bn.update_cpt(node, newcpt)
 
@@ -177,6 +166,7 @@ class BNReasoner:
             childs = self.bn.get_children(node)
             for child in childs:
                 self.bn.del_edge([node, child])
+
 
     def joint_probability(self) -> pd.DataFrame:
         """Get the truth table with probabilities by chain rule"""
@@ -277,15 +267,13 @@ class BNReasoner:
     def map_mpe_estimation(
         self, 
         E: pd.Series,
-        Q: Optional[List[str]] = None
+        Q: Optional[List[str]] = None,
+        heuristic: Optional[str] = "mindeg"
     ) -> pd.DataFrame:
 
         ## get all interesting variables:
-
         bn = self
-
         vars = bn.bn.get_all_variables()
-
         E_vars = []
         for i in range(0, len(E.index)):
                 E_vars.append(E.index[i])
@@ -293,7 +281,7 @@ class BNReasoner:
         # MAP?
         MAP = True
 
-        # in case of MPE, Q = all variables not in E
+        # in case of MPE, Q = all variables not in E (for pruning)
         if not (Q):
             MAP = False
             Q = []
@@ -301,29 +289,38 @@ class BNReasoner:
                 if var not in E_vars:
                     Q.append(var)
 
-        # 1. Prune the network
-        # all simplifying step in the truth tables are included
+        # 1. get order of elimination
+        # pass argument of heuristic to order function
+        # Assume: in case of MAP, the order of the MAP variables 
+        #         is not changing after summing out the others?
+        order = bn.order(heuristic = heuristic)
+
+        # 2. prune the network as far as possible
         bn.pruning(Q, E)
 
-        # 2. In case of MAP
-        # --> Multiply the factors and sum-out the variables not in Q and E
+        # 3. in case of MAP:
+        # Multiply the factors and sum-out the variables not in Q and E, that exist after pruning
 
         if MAP:
+            vars = bn.bn.get_all_variables()
             SumOut_Vars = []
             for var in vars:
-                if var not in E_vars or Q:
+                if var not in E_vars and var not in Q:
                     SumOut_Vars.append(var)
 
-            ## than multiply them and sum out
+            for var in order:
+                if var in SumOut_Vars:
+                # get the factor (multiply them)
+                # sum var out
+                # update the cpt
+                    order.remove(var)
+                    ...
+        
+        else:
+            bn.pruning_edges(E)
+        
 
-
-
-
-
-        # 3. maximise out
+        # 4. maximise out
         #   MPE: all variables not in the evidenz set (MPE_Q)
         #   MAP: all variales in Q
-
-
-
         return "Hello world"
