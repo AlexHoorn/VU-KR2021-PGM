@@ -164,10 +164,13 @@ class BNReasoner:
             childs = self.bn.get_children(node)
             for child in childs:
                 # only parent instantiation
-                newcpt = self.bn.get_compatible_instantiations_table(E.take([i]), self.bn.get_cpt(child))
+                # newcpt = self.bn.get_compatible_instantiations_table(E.take([i]), self.bn.get_cpt(child))
                 # all instantiations
-                # newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(child))
+                newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(child))
                 self.bn.update_cpt(child, newcpt)
+            # simplify also all CPTs of the evidenz itself
+            newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(node))
+            self.bn.update_cpt(node, newcpt)
 
         # then prune the edges
         for node in L:
@@ -269,3 +272,58 @@ class BNReasoner:
                     return False
         return True
     
+    ## TO DO: MAP and MPE estimation
+
+    def map_mpe_estimation(
+        self, 
+        E: pd.Series,
+        Q: Optional[List[str]] = None
+    ) -> pd.DataFrame:
+
+        ## get all interesting variables:
+
+        bn = self
+
+        vars = bn.bn.get_all_variables()
+
+        E_vars = []
+        for i in range(0, len(E.index)):
+                E_vars.append(E.index[i])
+
+        # MAP?
+        MAP = True
+
+        # in case of MPE, Q = all variables not in E
+        if not (Q):
+            MAP = False
+            Q = []
+            for var in vars:
+                if var not in E_vars:
+                    Q.append(var)
+
+        # 1. Prune the network
+        # all simplifying step in the truth tables are included
+        bn.pruning(Q, E)
+
+        # 2. In case of MAP
+        # --> Multiply the factors and sum-out the variables not in Q and E
+
+        if MAP:
+            SumOut_Vars = []
+            for var in vars:
+                if var not in E_vars or Q:
+                    SumOut_Vars.append(var)
+
+            ## than multiply them and sum out
+
+
+
+
+
+        # 3. maximise out
+        #   MPE: all variables not in the evidenz set (MPE_Q)
+        #   MAP: all variales in Q
+
+
+
+        return "Hello world"
