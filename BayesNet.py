@@ -6,6 +6,7 @@ import math
 import itertools
 import pandas as pd
 from copy import deepcopy
+import numpy as np, numpy.random
 
 
 class BayesNet:
@@ -226,3 +227,32 @@ class BayesNet:
         :param edge: Edge to be deleted (e.g. ('A', 'B')).
         """
         self.structure.remove_edge(edge[0], edge[1])
+
+    def load_random(self, nr_of_nodes, edge_prob) -> None:
+        #G = nx.random_tree(nr_of_nodes)
+        G = nx.fast_gnp_random_graph(nr_of_nodes,edge_prob,None)
+        G = nx.to_directed(G)
+
+        if not nx.is_directed_acyclic_graph(G):
+            raise Exception('The provided graph is not acyclic.')
+
+        variables = list(G.nodes)
+        edges = list(nx.edges(G))
+        cpts = {}        
+        # for each var, add random CPT
+        for var in variables:
+            probabilities = []
+            cols  = [c for c in G.predecessors(var)]
+            worlds = [list(i) for i in itertools.product([False, True], 
+                                repeat=len(cols))]
+
+            data = pd.DataFrame(worlds, columns = cols)
+            for i in range(int(len(data)/2)):
+                ps = (np.random.dirichlet(np.ones(2),size=1)).flatten()
+                for c in ps:
+                    probabilities.append(c)
+
+            data['p'] = probabilities
+            cpts[var] = data
+
+        self.create_bn(variables, edges, cpts)
