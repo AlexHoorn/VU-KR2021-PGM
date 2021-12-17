@@ -1,12 +1,12 @@
-#from _typeshed import Self
 from copy import deepcopy
 from itertools import combinations, product
-from typing import Dict, List, Optional, Union
-from networkx.algorithms.shortest_paths.generic import has_path
+from typing import Dict, List, Optional, Set, Union
 
+import networkx as nx
 import pandas as pd
 from networkx.classes.graph import Graph
-import networkx as nx
+from pandas.core.frame import DataFrame
+
 from BayesNet import BayesNet
 
 
@@ -175,23 +175,17 @@ class BNReasoner:
             for child in childs:
                 self.bn.del_edge([node, child])
 
-    def joint_probability(self) -> pd.DataFrame:
+    def joint_probability(self, sort=False) -> pd.DataFrame:
         """Get the truth table with probabilities by chain rule"""
-        # TODO: Perhaps make vars queryable to improve performance
-        variables = self.bn.get_all_variables()
+        Q = self.bn.get_all_variables()
 
         # DataFrame with combinations of True and False per var
-        truth_table = pd.DataFrame(
-            product([True, False], repeat=len(variables)), columns=variables
-        )
+        truth_table = pd.DataFrame(product([True, False], repeat=len(Q)), columns=Q)
 
         for i, col in enumerate(truth_table):
             j = self.bn.get_cpt(col)
-            # Determine what columns to merge on
-            j_cols = j.columns
-            j_cols = list(j_cols[j_cols != "p"])
             # Merge truth table with probabilities
-            truth_table = truth_table.merge(j, on=j_cols)
+            truth_table = truth_table.merge(j)
             # Rename column with probability
             truth_table.rename({"p": f"p_{i}"}, inplace=True, axis=1)
 
@@ -205,34 +199,112 @@ class BNReasoner:
 
         truth_table.drop(p_cols, axis=1, inplace=True)
 
+        # Apply tidy sorting, disabled by default because of a small performance cost
+        if sort:
+            truth_table.sort_values(
+                list(truth_table.columns), ascending=False, inplace=True
+            )
+
         return truth_table
 
     def marginal_distribution(
         self,
-        Q: Optional[List[str]] = None,
+        Q: List[str],
         E: Optional[Dict[str, bool]] = None,
+        normalize=True,
+        sort=False,
     ) -> pd.DataFrame:
-        probabilities = self.joint_probability()
+        # Create empty evidence if not given
+        if E is None:
+            E = {}
 
-        # If we only want specific vars then sum over all others
-        if Q is not None:
-            probabilities = (
-                probabilities.groupby(Q).agg({"p": "sum"}).reset_index()
-            )
-        else:
-            Q = self.bn.get_all_variables()
+        # Collect all vars this query depends on
+        all_vars: Set[str] = set()
+        for q in Q:
+            all_vars = all_vars | self.get_predecessors(q)
+        # These cpts denote our world according to our observations (evidence)
+        all_cpts = {var: self.get_cpt_evidence(var, E) for var in all_vars}
 
-        if E is not None:
-            # Make sure we can query given evidence
-            for v in E:
-                assert v in Q, f"evidence '{v}' not in {Q}"
+        cpts = []
+        # Construct end result for every Q
+        for q in Q:
+            # Recursively merge cpt with its predecessors
+            cpt = self._marginal_merge_predecessors(all_cpts[q], all_cpts)
 
-            # Using pandas query and a query string
-            # e.g. '`Winter?` == True and `Wet Grass?` == False'
-            queries = [f"`{v}` == {e}" for v, e in E.items()]
-            return probabilities.query(" and ".join(queries))
+            # Drop columns for which we have observations (evidence)
+            cpt = cpt.drop([c for c in cpt.columns if c in E], axis=1)
 
-        return probabilities
+            # Normalize by the sum of the other variables except q
+            norm_cols = [c for c in cpt.columns if c not in [q, "p"]]
+            if normalize:
+                cpt["p"] = cpt["p"] / cpt.groupby(norm_cols)["p"].transform("sum")
+
+            # Apply tidy sorting, disabled by default because of a small performance cost
+            if sort:
+                cpt = cpt[norm_cols + [q, "p"]] # reorder columns
+                cpt = cpt.sort_values(list(cpt.columns)[:-1], ascending=False)
+
+            cpts.append(cpt)
+
+        return cpts
+
+    @classmethod
+    def _marginal_merge_predecessors(cls, cpt, all_cpts):
+        # This assumes that a cpt always has itsself and p as the last 2 columns
+        preds = cpt.columns[:-2]
+
+        # Return cpt if no predecessors
+        if len(preds) == 0:
+            return cpt
+
+        # Recursively get cpt for every predecessors by merging with their predecessors
+        pred_cpts = [
+            cls._marginal_merge_predecessors(all_cpts[p], all_cpts) for p in preds
+        ]
+
+        # Merge the cpts of the predecessors
+        for pred_cpt in pred_cpts:
+            merge_cols = list(
+                set(cpt.columns).intersection(set(pred_cpt.columns)) - set("p")
+            )  # Intersection of columns in cpt and pred_cpt minus "p"
+
+            cpt = cpt.merge(pred_cpt, on=merge_cols, suffixes=("_x", "_y"))
+
+            # Multiply the probabilities
+            cpt["p"] = cpt["p_x"] * cpt["p_y"]
+            cpt = cpt.drop(["p_x", "p_y"], axis=1)
+
+        return cpt
+
+    # This gets ALL predecessors in the whole path, not just the direct predecessors of the node
+    def get_predecessors(self, q: str) -> Set[str]:
+        G = self.bn.structure
+        tree_vars = set([q])
+
+        while True:
+            cache_tree_vars = tree_vars.copy()
+            for var in cache_tree_vars:
+                for var in G.predecessors(var):
+                    tree_vars.add(var)
+
+            if tree_vars == cache_tree_vars:
+                break
+
+        return tree_vars
+
+    def get_cpt_evidence(self, variable: str, E: pd.Series):
+        return self._query_cpt(self.bn.get_cpt(variable), E)
+
+    @staticmethod
+    def _query_cpt(cpt: DataFrame, query: pd.Series):
+        if query is None:
+            return cpt
+
+        for q, v in query.items():
+            if q in cpt.columns:
+                cpt = cpt[cpt[q] == v]
+
+        return cpt
 
     def d_separation_with_pruning(self, X, Z, Y):
         # copy the graph 
@@ -252,7 +324,6 @@ class BNReasoner:
            # print('after deleting leaf nodes: '+ str(P.bn.get_all_variables()))
             if count == 0:
                 deletion = False
-
 
         # delete outgoing edges from Z
         for var in Z:
