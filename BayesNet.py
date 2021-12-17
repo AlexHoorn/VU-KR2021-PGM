@@ -1,6 +1,7 @@
 from typing import List, Tuple, Dict
 import networkx as nx
 import matplotlib.pyplot as plt
+from networkx.generators import directed
 from pgmpy.readwrite import XMLBIFReader
 import math
 import itertools
@@ -73,7 +74,6 @@ class BayesNet:
         
         # load edges
         edges = bif_reader.get_edges()
-
         self.create_bn(variables, edges, cpts)
 
     # METHODS THAT MIGHT ME USEFUL -------------------------------------------------------------------------------------
@@ -229,30 +229,29 @@ class BayesNet:
         self.structure.remove_edge(edge[0], edge[1])
 
     def load_random(self, nr_of_nodes, edge_prob) -> None:
-        #G = nx.random_tree(nr_of_nodes)
-        G = nx.fast_gnp_random_graph(nr_of_nodes,edge_prob,None)
-        G = nx.to_directed(G)
 
-        if not nx.is_directed_acyclic_graph(G):
-            raise Exception('The provided graph is not acyclic.')
+        G = nx.fast_gnp_random_graph(nr_of_nodes,edge_prob, directed= True)
+        DAG = nx.DiGraph([(u, v) for (u, v) in G.edges() if u < v])
 
-        variables = list(G.nodes)
-        edges = list(nx.edges(G))
+        variables = list(DAG.nodes())
+        edges = list(DAG.edges())
+
         cpts = {}        
         # for each var, add random CPT
         for var in variables:
             probabilities = []
-            cols  = [c for c in G.predecessors(var)]
+            cols  = [c for c in DAG.predecessors(var)]
             worlds = [list(i) for i in itertools.product([False, True], 
                                 repeat=len(cols))]
 
-            data = pd.DataFrame(worlds, columns = cols)
-            for i in range(int(len(data)/2)):
+            dat = pd.DataFrame(worlds, columns = cols)
+            for i in range(int(len(dat)/2)):
                 ps = (np.random.dirichlet(np.ones(2),size=1)).flatten()
                 for c in ps:
                     probabilities.append(c)
 
-            data['p'] = probabilities
-            cpts[var] = data
+            dat['p'] = probabilities
+            
+            cpts[var] = dat
 
         self.create_bn(variables, edges, cpts)
