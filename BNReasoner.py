@@ -61,15 +61,17 @@ class BNReasoner:
         G = self.bn.structure.to_undirected()
         nodes = self.bn.get_all_variables()
 
+        # Get all vars if X is None
         if X is None:
             X = nodes.copy()
 
+        # Adjacency dict where every key is a node and the items its neighbors
+        adjacency = self.adjacency(G)
+
+        # Remove the nodes we're not interested in
         not_X = [node for node in nodes if node not in X]
         for node in not_X:
-            G.remove_node(node)
-
-        adjacency = self.adjacency(G)
-        order = []
+            self._elim_adjacency(adjacency, node)
 
         # Check whether given heuristic is valid
         heuristics = ["mindeg","minfill"]
@@ -81,6 +83,7 @@ class BNReasoner:
         # Select minimum if we want ascending order, otherwise maximum
         select = min if ascending else max
 
+        order = []
         for _ in range(len(adjacency)):
             # Select the node to eliminate from G based on heuristic
             v = select(adjacency, key=lambda x: order_func(adjacency, x))
