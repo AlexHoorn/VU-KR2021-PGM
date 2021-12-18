@@ -1,4 +1,6 @@
+import os
 import random
+from functools import cache
 from multiprocessing import Pool, freeze_support
 from time import perf_counter
 from typing import List
@@ -6,25 +8,39 @@ from typing import List
 import pandas as pd
 from networkx import DiGraph
 from tqdm import tqdm
+
 from BayesNet import BayesNet
 from BNReasoner import BNReasoner
-from functools import cache
+
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 
 def main():
-    # Temporary (everything 20 times for statistic soundness)
-    files = [
-        r"testing\dog_problem.BIFXML",
-        r"testing\lecture_example.BIFXML",
-        r"testing\lecture_example2.BIFXML",
-    ] * 20
+    # Everything 20 times for statistic soundness
+    # files = [
+    #     r"testing\dog_problem.BIFXML",
+    #     r"testing\lecture_example.BIFXML",
+    #     r"testing\lecture_example2.BIFXML",
+    # ] * 20
 
-    bnreasoners = [load_reasoner(file) for file in files]
+    # bnreasoners = [load_reasoner(file) for file in files]
+
+    n_nodes = [n ** 2 for n in range(2, 28, 2)] * 5
+    bnreasoners = []
+    with Pool() as pool:
+        for bnr in tqdm(
+            pool.imap_unordered(random_reasoner, n_nodes),
+            total=len(n_nodes),
+            desc="Generating random networks",
+        ):
+            bnreasoners.append(bnr)
 
     results = []
     with Pool() as pool:
         for result in tqdm(
-            pool.imap_unordered(experiment, bnreasoners), total=len(bnreasoners)
+            pool.imap_unordered(experiment, bnreasoners),
+            total=len(bnreasoners),
+            desc="Executing experiments",
         ):
             results.append(result)
 
@@ -36,6 +52,14 @@ def main():
 def load_reasoner(file: str):
     bnet = BayesNet()
     bnet.load_from_bifxml(file)
+    bnreasoner = BNReasoner(bnet)
+
+    return bnreasoner
+
+
+def random_reasoner(n_nodes, mean_edges=3):
+    bnet = BayesNet()
+    bnet.load_random(n_nodes, mean_edges)
     bnreasoner = BNReasoner(bnet)
 
     return bnreasoner
@@ -78,8 +102,10 @@ def experiment(bnreasoner: BNReasoner):
 
     # Measured experiment here
     # This is an example
-    bnreasoner.pruning(Q, pd.Series(E))
-    _ = bnreasoner.marginal_distribution(Q, E)
+    try:
+        _ = bnreasoner.marginal_distribution(Q, E)
+    except Exception as e:
+        info["exception"] = str(e)
 
     info["runtime"] = perf_counter() - runtime
 
