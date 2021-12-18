@@ -229,29 +229,30 @@ class BayesNet:
         self.structure.remove_edge(edge[0], edge[1])
 
     def load_random(self, n_nodes=5, mean_edges=3) -> None:
-        edge_prob = mean_edges / n_nodes
-        G = nx.fast_gnp_random_graph(n_nodes,edge_prob, directed= True)
-        DAG = nx.DiGraph([(str(u), str(v)) for (u, v) in G.edges() if u < v])
+        # Decrease edge prob as more nodes are added otherwise edges per node will explode
+        G = nx.fast_gnp_random_graph(n_nodes, mean_edges / n_nodes, directed=True)
+        # Add generated edges to new graph, u < v makes sure the graph is a tree
+        G = nx.DiGraph([(str(u), str(v)) for (u, v) in G.edges() if u < v])
 
-        variables = list(DAG.nodes())
-        edges = list(DAG.edges())
+        variables = list(G.nodes())
+        edges = list(G.edges())
 
-        cpts = {}        
-        # for each var, add random CPT
+        cpts = {}
+        # For each var, add random cpt
         for var in variables:
+            # Create truth table without probabilities
+            cols = [c for c in G.predecessors(var)] + [var]
+            cpt = pd.DataFrame(
+                itertools.product([False, True], repeat=len(cols)), columns=cols
+            )
+
             probabilities = []
-            cols  = [c for c in DAG.predecessors(var)] + [var]
-            worlds = [list(i) for i in itertools.product([False, True], 
-                                repeat=len(cols))]
+            # Use dirichlet to get sets of probabilities that together sum to 1
+            for _ in range(int(len(cpt) / 2)):
+                for p in np.random.dirichlet([1, 1]):
+                    probabilities.append(p)
 
-            dat = pd.DataFrame(worlds, columns = cols)
-            for i in range(int(len(dat)/2)):
-                ps = (np.random.dirichlet(np.ones(2),size=1)).flatten()
-                for c in ps:
-                    probabilities.append(c)
-
-            dat['p'] = probabilities
-            
-            cpts[var] = dat
+            cpt["p"] = probabilities
+            cpts[var] = cpt
 
         self.create_bn(variables, edges, cpts)
