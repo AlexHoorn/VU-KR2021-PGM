@@ -122,36 +122,25 @@ class BNReasoner:
         del adjacency[node]
 
     def pruning(self, Q: List[str], E: pd.Series) -> None:
-
-        ## first prune the leaves
-
-        # Q = ['Wet Grass?']
-        # E = pd.Series({'Winter?': True, 'Rain?': False})
-        # bn.pruning(["Wet Grass?"], pd.Series({'Winter?': True, 'Rain?': False}))
+        ## prune a network for a given query and evidence set as far as possible
 
         # combined set of states
-        L = Q
+        L = deepcopy(Q)
         for i in range(0, len(E.index)):
             if E.index[i] not in L:
                 L.append(E.index[i])
 
+        # first prune the leaves
         # repeat this as often as possible
         simpl = True
-
         while(simpl):
-
             V = self.bn.get_all_variables()
             count = 0
-
-            if len(V) == len(L):
-                simpl = False
-
             for i in range(len(V)):
                 if V[i] not in L:
                     if len(self.bn.get_children(V[i])) == 0:
                         self.bn.del_var(V[i])
                         count += 1
-            
             if count == 0:
                 simpl = False
                 
@@ -164,10 +153,13 @@ class BNReasoner:
             childs = self.bn.get_children(node)
             for child in childs:
                 # only parent instantiation
-                newcpt = self.bn.get_compatible_instantiations_table(E.take([i]), self.bn.get_cpt(child))
+                # newcpt = self.bn.get_compatible_instantiations_table(E.take([i]), self.bn.get_cpt(child))
                 # all instantiations
-                # newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(child))
+                newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(child))
                 self.bn.update_cpt(child, newcpt)
+            # simplify also all CPTs of the evidenz itself --> STATE THAT IN THE REPORT MAYBE?
+            newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(node))
+            self.bn.update_cpt(node, newcpt)
 
         # then prune the edges
         for node in L:
@@ -340,3 +332,4 @@ class BNReasoner:
                     return False
         return True
     
+    ## TO DO: MAP and MPE estimation
