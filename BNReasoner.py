@@ -6,7 +6,6 @@ import networkx as nx
 import pandas as pd
 from networkx.classes.graph import Graph
 from pandas.core.frame import DataFrame
-
 from BayesNet import BayesNet
 
 
@@ -179,82 +178,92 @@ class BNReasoner:
             for child in childs:
                 self.bn.del_edge([node, child])
 
-    def joint_probability(self, sort=False) -> pd.DataFrame:
+    def joint_probability(
+        self, Q: Optional[List[str]] = None, E: Optional[Dict[str, bool]] = None
+    ) -> pd.DataFrame:
         """Get the truth table with probabilities by chain rule"""
-        Q = self.bn.get_all_variables()
+        nodes = self.bn.get_all_variables()
+
+        if E is None:
+            E = {}
 
         # DataFrame with combinations of True and False per var
-        truth_table = pd.DataFrame(product([True, False], repeat=len(Q)), columns=Q)
+        cpt = pd.DataFrame(product([True, False], repeat=len(nodes)), columns=nodes)
 
-        for i, col in enumerate(truth_table):
-            j = self.bn.get_cpt(col)
+        for i, col in enumerate(cpt):
+            j = self.get_cpt_evidence(col, E)
             # Merge truth table with probabilities
-            truth_table = truth_table.merge(j)
+            cpt = cpt.merge(j)
             # Rename column with probability
-            truth_table.rename({"p": f"p_{i}"}, inplace=True, axis=1)
-
-        # Determine what columns have probabilities
-        p_cols = [col for col in truth_table.columns if col.startswith("p_")]
+            cpt.rename({"p": f"p_{i}"}, inplace=True, axis=1)
 
         # Multiply all probabilities
-        truth_table["p"] = 1
-        for col in p_cols:
-            truth_table["p"] = truth_table["p"] * truth_table[col]
+        p_cols = [col for col in cpt.columns if col.startswith("p_")]
+        cpt["p"] = cpt[p_cols].product(axis=1)
+        cpt.drop(p_cols, axis=1, inplace=True)
 
-        truth_table.drop(p_cols, axis=1, inplace=True)
+        # Remove columns with evidence
+        if E is not None:
+            cpt = cpt.drop(list(E.keys()), axis=1)
 
-        # Apply tidy sorting, disabled by default because of a small performance cost
-        if sort:
-            truth_table.sort_values(
-                list(truth_table.columns), ascending=False, inplace=True
-            )
+        # Sum by Q
+        if Q is not None:
+            cpt = cpt.groupby(Q)["p"].sum().reset_index()
 
-        return truth_table
+        # Normalize by sum
+        cpt["p"] = cpt["p"] / cpt["p"].sum()
+
+        # Apply tidy sorting
+        cpt = cpt.sort_values(list(cpt.columns), ascending=False)
+        cpt = cpt.reset_index(drop=True)
+
+        return cpt
 
     def marginal_distribution(
-        self,
-        Q: List[str],
-        E: Optional[Dict[str, bool]] = None,
-        normalize=True,
-        sort=False,
+        self, Q: List[str], E: Optional[Dict[str, bool]] = None,
     ) -> pd.DataFrame:
         # Create empty evidence if not given
         if E is None:
             E = {}
 
-        # Collect all vars this query depends on
-        all_vars: Set[str] = set()
-        for q in Q:
-            all_vars = all_vars | self.get_predecessors(q)
-        # These cpts denote our world according to our observations (evidence)
-        all_cpts = {var: self.get_cpt_evidence(var, E) for var in all_vars}
-
         cpts = []
         # Construct end result for every Q
         for q in Q:
             # Recursively merge cpt with its predecessors
-            cpt = self._marginal_merge_predecessors(all_cpts[q], all_cpts)
-
-            # Drop columns for which we have observations (evidence)
-            cpt = cpt.drop([c for c in cpt.columns if c in E], axis=1)
-
-            # Normalize by the sum of the other variables except q
-            norm_cols = [c for c in cpt.columns if c not in [q, "p"]]
-            if normalize and len(norm_cols) > 0:
-                cpt["p"] = cpt["p"] / cpt.groupby(norm_cols)["p"].transform("sum")
-
-            # Apply tidy sorting, disabled by default because of a small performance cost
-            if sort:
-                cpt = cpt[norm_cols + [q, "p"]] # reorder columns
-                cpt = cpt.sort_values(list(cpt.columns)[:-1], ascending=False)
-
+            cpt = self._merge_predecessors(q, E)
             cpts.append(cpt)
 
-        return cpts
+        # Create new cpt for Q variables
+        cpt_Q = pd.DataFrame(product([True, False], repeat=len(Q)), columns=Q)
 
-    @classmethod
-    def _marginal_merge_predecessors(cls, cpt, all_cpts):
-        # This assumes that a cpt always has itsself and p as the last 2 columns
+        for cpt in cpts:
+            # Merge gathered cpts into new cpt
+            cpt_Q = cpt_Q.merge(cpt)
+
+        # Eliminate rows with 0
+        cpt_Q = cpt_Q[~(cpt_Q.select_dtypes("number") == 0).any(axis=1)]
+
+        # Determine columns with probabilities
+        p_cols = [c for c in cpt_Q.columns if c.startswith("p_")]
+        # Calculate probability
+        cpt_Q["p"] = cpt_Q[p_cols].product(axis=1)
+        # Normalize probability by sum
+        cpt_Q["p"] = cpt_Q["p"] / cpt_Q["p"].sum()
+        # Drop external probabilities
+        cpt_Q = cpt_Q.drop(p_cols, axis=1)
+
+        # Sum probabilities by Q
+        cpt_Q = cpt_Q.groupby(Q).agg({"p": "sum"}).reset_index()
+
+        # Apply tidy sorting
+        cpt_Q.sort_values(list(cpt_Q.columns), ascending=False, inplace=True)
+
+        return cpt_Q
+
+    def _merge_predecessors(self, var: str, E: Dict[str, bool]):
+        cpt = self.get_cpt_evidence(var, E)
+        cpt = cpt.rename({"p": f"p_{var}"}, axis=1)
+        # This assumes that a cpt always has itself and p as the last 2 columns
         preds = cpt.columns[:-2]
 
         # Return cpt if no predecessors
@@ -262,21 +271,15 @@ class BNReasoner:
             return cpt
 
         # Recursively get cpt for every predecessors by merging with their predecessors
-        pred_cpts = [
-            cls._marginal_merge_predecessors(all_cpts[p], all_cpts) for p in preds
-        ]
+        pred_cpts = [self._merge_predecessors(p, E) for p in preds]
 
         # Merge the cpts of the predecessors
         for pred_cpt in pred_cpts:
-            merge_cols = list(
-                set(cpt.columns).intersection(set(pred_cpt.columns)) - set("p")
-            )  # Intersection of columns in cpt and pred_cpt minus "p"
+            cpt = cpt.merge(pred_cpt)
 
-            cpt = cpt.merge(pred_cpt, on=merge_cols, suffixes=("_x", "_y"))
+            # Remove any evidence columns
 
-            # Multiply the probabilities
-            cpt["p"] = cpt["p_x"] * cpt["p_y"]
-            cpt = cpt.drop(["p_x", "p_y"], axis=1)
+        cpt = cpt.drop([c for c in preds if c in cpt.columns and c in E], axis=1)
 
         return cpt
 
