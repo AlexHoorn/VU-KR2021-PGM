@@ -228,9 +228,9 @@ class BayesNet:
         """
         self.structure.remove_edge(edge[0], edge[1])
 
-    def load_random(self, nr_of_nodes, edge_prob) -> None:
-
-        G = nx.fast_gnp_random_graph(nr_of_nodes,edge_prob, directed= True)
+    def load_random(self, n_nodes=5, mean_edges=3) -> None:
+        edge_prob = mean_edges / n_nodes
+        G = nx.fast_gnp_random_graph(n_nodes,edge_prob, directed= True)
         DAG = nx.DiGraph([(u, v) for (u, v) in G.edges() if u < v])
 
         variables = list(DAG.nodes())
@@ -240,7 +240,7 @@ class BayesNet:
         # for each var, add random CPT
         for var in variables:
             probabilities = []
-            cols  = [c for c in DAG.predecessors(var)]
+            cols  = [c for c in DAG.predecessors(var)] + [var]
             worlds = [list(i) for i in itertools.product([False, True], 
                                 repeat=len(cols))]
 
