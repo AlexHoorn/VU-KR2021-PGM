@@ -236,7 +236,7 @@ class BNReasoner:
 
             # Normalize by the sum of the other variables except q
             norm_cols = [c for c in cpt.columns if c not in [q, "p"]]
-            if normalize:
+            if normalize and len(norm_cols) > 0:
                 cpt["p"] = cpt["p"] / cpt.groupby(norm_cols)["p"].transform("sum")
 
             # Apply tidy sorting, disabled by default because of a small performance cost
