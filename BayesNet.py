@@ -231,7 +231,7 @@ class BayesNet:
     def load_random(self, n_nodes=5, mean_edges=3) -> None:
         edge_prob = mean_edges / n_nodes
         G = nx.fast_gnp_random_graph(n_nodes,edge_prob, directed= True)
-        DAG = nx.DiGraph([(u, v) for (u, v) in G.edges() if u < v])
+        DAG = nx.DiGraph([(str(u), str(v)) for (u, v) in G.edges() if u < v])
 
         variables = list(DAG.nodes())
         edges = list(DAG.edges())
