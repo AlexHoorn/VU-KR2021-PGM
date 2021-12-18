@@ -51,25 +51,33 @@ class BNReasoner:
                 return False
         return True 
 
-    def order(self, X=None, heuristic="mindeg", ascending=True) -> List[str]:
-        G = self.bn.get_interaction_graph()
-        all_nodes = self.bn.get_all_variables()
+    def order(
+        self,
+        X: Optional[List[str]] = None,
+        heuristic: str = "mindeg",
+        ascending: bool = True,
+    ) -> List[str]:
+        # Get undirected Graph
+        G = self.bn.structure.to_undirected()
+        nodes = self.bn.get_all_variables()
 
-        if X is not None:
-            for node in all_nodes:
-                if node not in X:
-                    G.remove_node(node)
+        if X is None:
+            X = nodes.copy()
+
+        not_X = [node for node in nodes if node not in X]
+        for node in not_X:
+            G.remove_node(node)
 
         adjacency = self.adjacency(G)
         order = []
 
         # Check whether given heuristic is valid
-        heuristics = {
-            h.split("_")[-1] for h in dir(self) if h.startswith("_order_heuristic_")
-        }
+        heuristics = ["mindeg","minfill"]
         assert heuristic in heuristics, f"heuristic must be one of {heuristics}"
+
         # Determine the function that depicts our selection heuristic
         order_func = getattr(self, f"_order_heuristic_{heuristic}")
+        
         # Select minimum if we want ascending order, otherwise maximum
         select = min if ascending else max
 
@@ -85,12 +93,12 @@ class BNReasoner:
 
     @staticmethod
     def _order_heuristic_mindeg(adjacency, node) -> int:
-        # Mindeg is just the amount of neighbors a node has
+        # Mindeg is the amount of neighbors a node has
         return len(adjacency[node])
 
     @staticmethod
     def _order_heuristic_minfill(adjacency: Dict[str, set], node: str) -> int:
-        # Minfill is the amount of edges necessary to remove a node
+        # Minfill is the amount of edges that need to be added to remove a node
         e = 0
         for u, v in combinations(adjacency[node], 2):
             if u not in adjacency[v]:
@@ -104,21 +112,22 @@ class BNReasoner:
         return {v: set(G[v]) - set([v]) for v in G}
 
     @staticmethod
-    def _elim_adjacency(adjacency: Dict[str, set], node: str):
-        # Eliminate a variable and (re)add necessary edges
+    def _elim_adjacency(adjacency: Dict[str, set], node: str) -> None:
+        # Eliminate a variable and add edges between its neighbors
+        # this is done inplace of the given adjacency dict, so no new dict is returned
         neighbors = adjacency[node]
-        new_edges = set()
 
+        # Create edges between all neighbors
         for u, v in combinations(neighbors, 2):
             if v not in adjacency[u]:
                 adjacency[u].add(v)
                 adjacency[v].add(u)
-                new_edges.add((u, v))
-                new_edges.add((v, u))
 
+        # Remove mention of node in every neighbor
         for v in neighbors:
             adjacency[v].discard(node)
 
+        # Remove node from adjacency dict
         del adjacency[node]
 
     def pruning(self, Q: List[str], E: pd.Series) -> None:
