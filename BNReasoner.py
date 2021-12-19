@@ -348,3 +348,173 @@ class BNReasoner:
         return True
     
     ## TO DO: MAP and MPE estimation
+
+    def map_mpe_estimation(
+        self, 
+        E: pd.Series,
+        Q: Optional[List[str]] = None,
+        heuristic: Optional[str] = "mindeg"
+    ) -> pd.DataFrame:
+
+        ## get all interesting variables:
+        bn = deepcopy(self)
+        vars = bn.bn.get_all_variables()
+        E_vars = []
+        for i in range(0, len(E.index)):
+                E_vars.append(E.index[i])
+
+        # MAP?
+        MAP = True
+
+        # in case of MPE, Q = all variables not in E (for pruning)
+        if not (Q):
+            MAP = False
+            Q = []
+            for var in vars:
+                if var not in E_vars:
+                    Q.append(var)
+
+        # 1. prune the network as far as possible
+        bn.pruning(Q, E)
+
+        # 2. get order of elimination
+        # pass argument of heuristic to order function
+        # Assume: in case of MAP, the order of the MAP variables 
+        #         is not changing after summing out the others?
+        order = bn.order(heuristic = heuristic)
+
+
+        # 3. in case of MAP:
+        # Multiply the factors and sum-out the variables not in Q and E, that exist after pruning
+
+        if MAP:
+            vars = bn.bn.get_all_variables()
+            SumOut_Vars = []
+            for var in vars:
+                if var not in E_vars and var not in Q:
+                    SumOut_Vars.append(var)
+
+            for var in order:
+                if var in SumOut_Vars:
+                # get the factor (multiply them)
+                # sum var out
+                # update the cpt
+                    order.remove(var)
+                    ...
+
+        
+
+        # 4. maximise out
+        #   MPE: all variables not in the evidenz set (MPE_Q)
+        #   MAP: all variales in Q
+        
+        CPT = bn.bn.get_all_cpts()
+
+        for node in order:      
+            # get new factor, all used cpts and the col names
+            used_cpts, newcpt, cols = self.multiplication_factors(CPT, node, E)
+            # maximise out
+            newcpt = self.maximise_out(newcpt, cols, node)
+            # maybe evidenz is already clear?
+            if len(np.unique(newcpt[node].values)) == 1:
+                if node not in E.index:
+                    E = E.append(pd.Series(newcpt.iloc[0][node], {node}))
+            # replace other factors
+            CPT[node] = newcpt #not referring to the name, thus this works
+            for var in used_cpts:
+                if var != node:
+                    del CPT[var]
+
+        ## build the result        
+        result = self.build_result(CPT)
+        return result
+                
+    @staticmethod
+    def build_result(CPT: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        # result: maybe there is more than one instantiation :/
+        max = 1
+        for cpt in CPT:
+            max *= CPT[cpt].shape[0]
+        
+        # make all single independent cpts containing as many rows as max
+        for cpt in CPT:
+            newcpt = CPT[cpt]
+            while newcpt.shape[0] < max:
+                newcpt = newcpt.append(CPT[cpt], ignore_index=True)
+            CPT[cpt] = newcpt
+        
+        data = {}
+        p = []
+        for i, cpt in enumerate(CPT):
+            for col in CPT[cpt].columns:
+                if col == "p":
+                    p.append(list(CPT[cpt][col].values))
+                else:
+                    data[col] = CPT[cpt][col]
+            
+        p = np.asmatrix(p)
+        p = np.prod(p, axis = 0)
+        p = p.tolist()
+        p = [item for sublist in p for item in sublist]
+
+        result = pd.DataFrame(data)
+        result["p"] = p
+        
+        result = result.query("p == p.max()").reset_index(drop = True)
+
+        return result
+
+    @staticmethod
+    def multiplication_factors(CPT: Dict[str, pd.DataFrame], 
+    node: str, E: pd.Series):
+
+        # select all cpts that are used and set the col names
+        used_cpts = {}          
+        cols = {node}
+
+        for cpt in CPT:
+            cpt_cols = (set(CPT[cpt].columns)) - set("p")
+            if node in cpt_cols:
+                used_cpts[cpt] = CPT[cpt]
+                cols = cols.union(cpt_cols)
+
+        # create newcpt for the faktor. Shorten it already as far as possible/needed
+        newcpt = pd.DataFrame(list(product([False, True], repeat=len(cols))),columns=cols)
+        newcpt["p"] = float(1)
+        newcpt = BayesNet.get_compatible_instantiations_table(E, newcpt)
+        newcpt = newcpt.reset_index(drop=True)
+        newcpt["valid"] = True
+
+        # multiply all faktors + check if rows are still needed
+        for i in range(newcpt.shape[0]):
+            row = pd.Series(newcpt.iloc[i][:-2], cols) # as instantiation
+            for cpt in used_cpts:
+                p = BayesNet.get_compatible_instantiations_table(row, used_cpts[cpt])["p"]
+                if len(p) == 0:
+                    newcpt.at[i, "valid"] = False
+                    break
+                else:
+                    p = p.values[0]
+                    newcpt.at[i, "p"] *= p
+            
+        newcpt = newcpt.loc[newcpt["valid"] == True].reset_index(drop = True)
+        del newcpt["valid"]
+        
+        return used_cpts, newcpt, cols
+
+    @staticmethod
+    def maximise_out(newcpt: pd.DataFrame, cols: Set[str], node: str) -> pd.DataFrame:
+
+        # max out and get all maxima
+        if len(cols) > 1:
+            maxcpt = newcpt.groupby(list(cols - {node}))["p"].max().reset_index()
+            fillcpt = []
+            for i in range(maxcpt.shape[0]):
+                inst = (pd.Series(maxcpt.iloc[i], maxcpt.columns)) # as instantiation
+                row = BayesNet.get_compatible_instantiations_table(inst, newcpt)
+                fillcpt.append(row)
+            newcpt = pd.concat(fillcpt, ignore_index=True)
+        else:
+            newcpt = newcpt.query("p == p.max()").reset_index(drop = True)
+
+        return newcpt
