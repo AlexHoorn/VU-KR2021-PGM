@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Set, Union
 
 import networkx as nx
 import pandas as pd
+import numpy as np
 from networkx.classes.graph import Graph
 from pandas.core.frame import DataFrame
 from BayesNet import BayesNet
@@ -378,38 +379,39 @@ class BNReasoner:
         bn.pruning(Q, E)
 
         # 2. get order of elimination
-        # pass argument of heuristic to order function
-        # Assume: in case of MAP, the order of the MAP variables 
-        #         is not changing after summing out the others?
         order = bn.order(heuristic = heuristic)
-
 
         # 3. in case of MAP:
         # Multiply the factors and sum-out the variables not in Q and E, that exist after pruning
+
+        CPT = bn.bn.get_all_cpts()
 
         if MAP:
             vars = bn.bn.get_all_variables()
             SumOut_Vars = []
             for var in vars:
-                if var not in E_vars and var not in Q:
+                if var not in Q:
                     SumOut_Vars.append(var)
 
-            for var in order:
-                if var in SumOut_Vars:
-                # get the factor (multiply them)
-                # sum var out
-                # update the cpt
-                    order.remove(var)
-                    ...
+            for node in order:
+                if node in SumOut_Vars:
+                    # get the new factor
+                    used_cpts, newcpt, cols = self.multiplication_factors(CPT, node, E)
+                    
+                    # sum var out + keep track of normalising
+                    newcpt = newcpt.groupby(list(cols - {node}))["p"].sum().reset_index()
 
-        
+                    # update + replace other factors
+                    CPT[node] = newcpt #not referring to the name, thus this works
+                    for var in used_cpts:
+                        if var != node:
+                            del CPT[var]
+
+            # update order
+            order = list(set(order) - set(SumOut_Vars))
 
         # 4. maximise out
-        #   MPE: all variables not in the evidenz set (MPE_Q)
-        #   MAP: all variales in Q
         
-        CPT = bn.bn.get_all_cpts()
-
         for node in order:      
             # get new factor, all used cpts and the col names
             used_cpts, newcpt, cols = self.multiplication_factors(CPT, node, E)
@@ -419,7 +421,7 @@ class BNReasoner:
             if len(np.unique(newcpt[node].values)) == 1:
                 if node not in E.index:
                     E = E.append(pd.Series(newcpt.iloc[0][node], {node}))
-            # replace other factors
+            # update + replace other factors
             CPT[node] = newcpt #not referring to the name, thus this works
             for var in used_cpts:
                 if var != node:
@@ -427,6 +429,7 @@ class BNReasoner:
 
         ## build the result        
         result = self.build_result(CPT)
+
         return result
                 
     @staticmethod
