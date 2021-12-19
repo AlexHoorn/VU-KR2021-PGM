@@ -1,3 +1,4 @@
+import random
 from copy import deepcopy
 from itertools import combinations, product
 from typing import Dict, List, Optional, Set, Union
@@ -6,6 +7,7 @@ import networkx as nx
 import pandas as pd
 from networkx.classes.graph import Graph
 from pandas.core.frame import DataFrame
+
 from BayesNet import BayesNet
 
 
@@ -73,7 +75,7 @@ class BNReasoner:
             self._elim_adjacency(adjacency, node)
 
         # Check whether given heuristic is valid
-        heuristics = ["mindeg","minfill"]
+        heuristics = ["random","mindeg","minfill"]
         assert heuristic in heuristics, f"heuristic must be one of {heuristics}"
 
         # Determine the function that depicts our selection heuristic
@@ -92,6 +94,10 @@ class BNReasoner:
             order.append(v)
 
         return order
+
+    @staticmethod
+    def _order_heuristic_random(*args) -> float:
+        return random.uniform()
 
     @staticmethod
     def _order_heuristic_mindeg(adjacency, node) -> int:
@@ -190,21 +196,22 @@ class BNReasoner:
         # DataFrame with combinations of True and False per var
         cpt = pd.DataFrame(product([True, False], repeat=len(nodes)), columns=nodes)
 
-        for i, col in enumerate(cpt):
-            j = self.get_cpt_evidence(col, E)
+        for node in nodes:
             # Merge truth table with probabilities
-            cpt = cpt.merge(j)
+            cpt = cpt.merge(self.get_cpt_evidence(node, E))
             # Rename column with probability
-            cpt.rename({"p": f"p_{i}"}, inplace=True, axis=1)
+            cpt = cpt.rename({"p": f"p_{node}"}, axis=1)
+
+        # Eliminate rows with 0
+        cpt = cpt[~(cpt.select_dtypes("number") == 0).any(axis=1)]
 
         # Multiply all probabilities
-        p_cols = [col for col in cpt.columns if col.startswith("p_")]
+        p_cols = cpt.select_dtypes("number").columns
         cpt["p"] = cpt[p_cols].product(axis=1)
         cpt.drop(p_cols, axis=1, inplace=True)
 
         # Remove columns with evidence
-        if E is not None:
-            cpt = cpt.drop(list(E.keys()), axis=1)
+        cpt = cpt.drop(list(E.keys()), axis=1)
 
         # Sum by Q
         if Q is not None:
@@ -226,39 +233,31 @@ class BNReasoner:
         if E is None:
             E = {}
 
-        cpts = []
-        # Construct end result for every Q
-        for q in Q:
-            # Recursively merge cpt with its predecessors
-            cpt = self._merge_predecessors(q, E)
-            cpts.append(cpt)
+        # Construct end result for every Q union E
+        Q_E = set(Q) | set(E)
+        cpt = pd.DataFrame(product([True, False], repeat=len(Q_E)), columns=Q_E)
 
-        # Create new cpt for Q variables
-        cpt_Q = pd.DataFrame(product([True, False], repeat=len(Q)), columns=Q)
-
-        for cpt in cpts:
-            # Merge gathered cpts into new cpt
-            cpt_Q = cpt_Q.merge(cpt)
+        for q in Q_E:
+            # Iteratively merge every q
+            q_cpt = self._merge_predecessors(q, E)
+            cpt = cpt.merge(q_cpt)
 
         # Eliminate rows with 0
-        cpt_Q = cpt_Q[~(cpt_Q.select_dtypes("number") == 0).any(axis=1)]
+        cpt = cpt[~(cpt.select_dtypes("number") == 0).any(axis=1)]
 
-        # Determine columns with probabilities
-        p_cols = [c for c in cpt_Q.columns if c.startswith("p_")]
         # Calculate probability
-        cpt_Q["p"] = cpt_Q[p_cols].product(axis=1)
-        # Normalize probability by sum
-        cpt_Q["p"] = cpt_Q["p"] / cpt_Q["p"].sum()
-        # Drop external probabilities
-        cpt_Q = cpt_Q.drop(p_cols, axis=1)
+        cpt["p"] = cpt.select_dtypes("number").product(axis=1)
 
         # Sum probabilities by Q
-        cpt_Q = cpt_Q.groupby(Q).agg({"p": "sum"}).reset_index()
+        cpt = cpt.groupby(Q).agg({"p": "sum"}).reset_index()
 
+        # Normalize probability by sum
+        cpt["p"] = cpt["p"] / cpt["p"].sum()
+        
         # Apply tidy sorting
-        cpt_Q.sort_values(list(cpt_Q.columns), ascending=False, inplace=True)
+        cpt = cpt.sort_values(list(cpt.columns), ascending=False)
 
-        return cpt_Q
+        return cpt
 
     def _merge_predecessors(self, var: str, E: Dict[str, bool]):
         cpt = self.get_cpt_evidence(var, E)
@@ -270,16 +269,12 @@ class BNReasoner:
         if len(preds) == 0:
             return cpt
 
-        # Recursively get cpt for every predecessors by merging with their predecessors
-        pred_cpts = [self._merge_predecessors(p, E) for p in preds]
+        # Recursively get cpt for every predecessors by merging with their own predecessors
+        pred_cpts = (self._merge_predecessors(p, E) for p in preds)
 
         # Merge the cpts of the predecessors
         for pred_cpt in pred_cpts:
             cpt = cpt.merge(pred_cpt)
-
-            # Remove any evidence columns
-
-        cpt = cpt.drop([c for c in preds if c in cpt.columns and c in E], axis=1)
 
         return cpt
 
