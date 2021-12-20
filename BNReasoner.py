@@ -4,8 +4,8 @@ from itertools import combinations, product
 from typing import Dict, List, Optional, Set, Union
 
 import networkx as nx
-import pandas as pd
 import numpy as np
+import pandas as pd
 from networkx.classes.graph import Graph
 from pandas.core.frame import DataFrame
 
@@ -98,7 +98,7 @@ class BNReasoner:
 
     @staticmethod
     def _order_heuristic_random(*args) -> float:
-        return random.uniform()
+        return random.uniform(0, 1)
 
     @staticmethod
     def _order_heuristic_mindeg(adjacency, node) -> int:
@@ -143,31 +143,25 @@ class BNReasoner:
         ## prune a network for a given query and evidence set as far as possible
 
         # combined set of states
-        L = deepcopy(Q)
-        for i in range(0, len(E.index)):
-            if E.index[i] not in L:
-                L.append(E.index[i])
+        L = set(Q) | set(E.index)
 
         # first prune the leaves
         # repeat this as often as possible
-        simpl = True
-        while(simpl):
+        while True:
             V = self.bn.get_all_variables()
             count = 0
-            for i in range(len(V)):
-                if V[i] not in L:
-                    if len(self.bn.get_children(V[i])) == 0:
-                        self.bn.del_var(V[i])
+            for v in V:
+                if v not in L:
+                    if len(self.bn.get_children(v)) == 0:
+                        self.bn.del_var(v)
                         count += 1
             if count == 0:
-                simpl = False
+                break
                 
         # adjust the CPTs
-        L = []
-        for i in range(0, len(E.index)):
-            L.append(E.index[i])
+        L = set(E.index)
 
-        for i, node in enumerate(L):
+        for node in L:
             childs = self.bn.get_children(node)
             for child in childs:
                 # only parent instantiation
@@ -183,7 +177,7 @@ class BNReasoner:
         for node in L:
             childs = self.bn.get_children(node)
             for child in childs:
-                self.bn.del_edge([node, child])
+                self.bn.del_edge((node, child))
 
     def joint_probability(
         self, Q: Optional[List[str]] = None, E: Optional[Dict[str, bool]] = None
@@ -196,6 +190,7 @@ class BNReasoner:
 
         # DataFrame with combinations of True and False per var
         cpt = pd.DataFrame(product([True, False], repeat=len(nodes)), columns=nodes)
+        cpt = self._query_cpt(cpt, E)
 
         for node in nodes:
             # Merge truth table with probabilities
@@ -279,33 +274,16 @@ class BNReasoner:
 
         return cpt
 
-    # This gets ALL predecessors in the whole path, not just the direct predecessors of the node
-    def get_predecessors(self, q: str) -> Set[str]:
-        G = self.bn.structure
-        tree_vars = set([q])
-
-        while True:
-            cache_tree_vars = tree_vars.copy()
-            for var in cache_tree_vars:
-                for var in G.predecessors(var):
-                    tree_vars.add(var)
-
-            if tree_vars == cache_tree_vars:
-                break
-
-        return tree_vars
-
-    def get_cpt_evidence(self, variable: str, E: pd.Series):
+    def get_cpt_evidence(self, variable: str, E: Dict[str, bool]):
         return self._query_cpt(self.bn.get_cpt(variable), E)
 
     @staticmethod
-    def _query_cpt(cpt: DataFrame, query: pd.Series):
-        if query is None:
+    def _query_cpt(cpt: DataFrame, query: Dict[str, bool]):
+        if query in [None, {}]:
             return cpt
 
-        for q, v in query.items():
-            if q in cpt.columns:
-                cpt = cpt[cpt[q] == v]
+        for q in set(cpt.columns) & set(query):
+            cpt = cpt[cpt[q] == query[q]]
 
         return cpt
 
