@@ -393,7 +393,7 @@ class BNReasoner:
                     # get the new factor
                     used_cpts, newcpt, cols = self.multiplication_factors(CPT, node, E)
                     
-                    # sum var out + keep track of normalising
+                    # sum var out
                     newcpt = newcpt.groupby(list(cols - {node}))["p"].sum().reset_index()
 
                     # update + replace other factors
@@ -443,7 +443,7 @@ class BNReasoner:
         
         data = {}
         p = []
-        for i, cpt in enumerate(CPT):
+        for cpt in CPT:
             for col in CPT[cpt].columns:
                 if col == "p":
                     p.append(list(CPT[cpt][col].values))
