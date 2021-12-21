@@ -1,5 +1,6 @@
 import itertools
 import math
+import random
 from copy import deepcopy
 from typing import Dict, List, Tuple
 
@@ -8,7 +9,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from pgmpy.readwrite import XMLBIFReader
-import random
 
 
 class BayesNet:

@@ -1,6 +1,8 @@
 import random
 from copy import deepcopy
+from functools import reduce
 from itertools import combinations, product
+from operator import mul
 from typing import Dict, List, Optional, Set, Union
 
 import networkx as nx
@@ -27,32 +29,6 @@ class BNReasoner:
         else:
             raise TypeError("net must be of type `str` or `BayesNet`")
 
-    # TODO: This is where your methods should go
-    def d_sep_wrong(self, Xset, Ev, Yset,) -> bool: 
-        for x in Xset:
-            for y in Yset:
-                print(x)
-                paths = list(nx.all_shortest_paths(self.bn.get_interaction_graph(), x,y))
-                for path in paths:
-                    print(path)
-                    if BNReasoner.block(path, Ev) == False:
-                        return False
-        return True
-    
-    def block_wrong(self, p, Ev,) -> bool:
-        for step in range(0,len(p)-2):
-            if (p[step+1] in self.bn.get_children(p[step]) and p[step+2] in self.bn.get_children(p[step+1])):
-                if p[step+1] not in Ev:
-                    return False
-            #converging valve
-            if p[step+1] in self.bn.get_children(p[step]) and p[step+1] in self.bn.get_children(p[step+2]):
-                if p[step+1] in Ev or nx.descendants(p[step+1]) in Ev:
-                    return False
-            #diverging valve
-            if p[step] in self.bn.get_children(p[step+1]) and p[step+2] in self.bn.get_children(p[step+1]):
-                return False
-        return True 
-
     def order(
         self,
         X: Optional[List[str]] = None,
@@ -68,7 +44,7 @@ class BNReasoner:
             X = nodes.copy()
 
         # Adjacency dict where every key is a node and the items its neighbors
-        adjacency = self.adjacency(G)
+        adjacency = self._adjacency(G)
 
         # Remove the nodes we're not interested in
         not_X = [node for node in nodes if node not in X]
@@ -76,16 +52,17 @@ class BNReasoner:
             self._elim_adjacency(adjacency, node)
 
         # Check whether given heuristic is valid
-        heuristics = ["random","mindeg","minfill"]
+        heuristics = ["random", "mindeg", "minfill"]
         assert heuristic in heuristics, f"heuristic must be one of {heuristics}"
 
         # Determine the function that depicts our selection heuristic
         order_func = getattr(self, f"_order_heuristic_{heuristic}")
-        
+
         # Select minimum if we want ascending order, otherwise maximum
         select = min if ascending else max
 
         order = []
+        # Adj changes during iteration so iterate over range of len
         for _ in range(len(adjacency)):
             # Select the node to eliminate from G based on heuristic
             v = select(adjacency, key=lambda x: order_func(adjacency, x))
@@ -97,7 +74,7 @@ class BNReasoner:
         return order
 
     @staticmethod
-    def _order_heuristic_random(*args) -> float:
+    def _order_heuristic_random(*_) -> float:
         return random.uniform(0, 1)
 
     @staticmethod
@@ -116,7 +93,7 @@ class BNReasoner:
         return e
 
     @staticmethod
-    def adjacency(G: Graph) -> Dict[str, set]:
+    def _adjacency(G: Graph) -> Dict[str, set]:
         # Get a dict with nodes as key and its adjacent nodes as set
         return {v: set(G[v]) - set([v]) for v in G}
 
@@ -140,42 +117,48 @@ class BNReasoner:
         del adjacency[node]
 
     def pruning(self, Q: List[str], E: pd.Series) -> None:
-        ## prune a network for a given query and evidence set as far as possible
+        # Prune a network for a given query and evidence set as far as possible
 
-        # combined set of states
+        # Combined set of states
         L = set(Q) | set(E.index)
 
-        # first prune the leaves
-        # repeat this as often as possible
+        # First prune the leaves repeat this as often as possible
         while True:
-            V = self.bn.get_all_variables()
+            V = set(self.bn.get_all_variables())
             count = 0
-            for v in V:
-                if v not in L:
-                    if len(self.bn.get_children(v)) == 0:
-                        self.bn.del_var(v)
-                        count += 1
+
+            # For every v not in L
+            for v in V - L:
+                if len(self.bn.get_children(v)) == 0:
+                    self.bn.del_var(v)
+                    count += 1
+
             if count == 0:
                 break
-                
-        # adjust the CPTs
+
+        # Adjust the CPTs
         L = set(E.index)
 
-        for node in L:
+        for node in set(E.index):
             childs = self.bn.get_children(node)
+
             for child in childs:
-                # only parent instantiation
-                # newcpt = self.bn.get_compatible_instantiations_table(E.take([i]), self.bn.get_cpt(child))
-                # all instantiations
-                newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(child))
+                # All instantiations
+                newcpt = self.bn.get_compatible_instantiations_table(
+                    E, self.bn.get_cpt(child)
+                )
                 self.bn.update_cpt(child, newcpt)
-            # simplify also all CPTs of the evidenz itself --> STATE THAT IN THE REPORT MAYBE?
-            newcpt = self.bn.get_compatible_instantiations_table(E, self.bn.get_cpt(node))
+
+            # Simplify also all CPTs of the evidenz itself
+            newcpt = self.bn.get_compatible_instantiations_table(
+                E, self.bn.get_cpt(node)
+            )
             self.bn.update_cpt(node, newcpt)
 
-        # then prune the edges
+        # Then prune the edges
         for node in L:
             childs = self.bn.get_children(node)
+
             for child in childs:
                 self.bn.del_edge((node, child))
 
@@ -192,7 +175,7 @@ class BNReasoner:
         cpt = pd.DataFrame(product([True, False], repeat=len(nodes)), columns=nodes)
         cpt = self._query_cpt(cpt, E)
 
-        for node in nodes:
+        for node in list(cpt.columns):
             # Merge truth table with probabilities
             cpt = cpt.merge(self.get_cpt_evidence(node, E))
             # Rename column with probability
@@ -249,33 +232,37 @@ class BNReasoner:
 
         # Normalize probability by sum
         cpt["p"] = cpt["p"] / cpt["p"].sum()
-        
+
         # Apply tidy sorting
         cpt = cpt.sort_values(list(cpt.columns), ascending=False)
 
         return cpt
 
     def _merge_predecessors(self, var: str, E: Dict[str, bool]):
-        cpt = self.get_cpt_evidence(var, E)
-        cpt = cpt.rename({"p": f"p_{var}"}, axis=1)
         # This assumes that a cpt always has itself and p as the last 2 columns
-        preds = cpt.columns[:-2]
+        preds = list(self.bn.structure.predecessors(var))
 
         # Return cpt if no predecessors
         if len(preds) == 0:
-            return cpt
+            return self.get_cpt_evidence(var, E, rename_p=True)
 
         # Recursively get cpt for every predecessors by merging with their own predecessors
         pred_cpts = (self._merge_predecessors(p, E) for p in preds)
 
-        # Merge the cpts of the predecessors
+        # Merge the cpt with cpts of the predecessors
+        cpt = self.get_cpt_evidence(var, E, rename_p=True)
         for pred_cpt in pred_cpts:
             cpt = cpt.merge(pred_cpt)
 
         return cpt
 
-    def get_cpt_evidence(self, variable: str, E: Dict[str, bool]):
-        return self._query_cpt(self.bn.get_cpt(variable), E)
+    def get_cpt_evidence(self, variable: str, E: Dict[str, bool], rename_p=False):
+        cpt = self._query_cpt(self.bn.get_cpt(variable), E)
+
+        if rename_p:
+            cpt = cpt.rename({"p": f"p_{variable}"}, axis=1)
+
+        return cpt
 
     @staticmethod
     def _query_cpt(cpt: DataFrame, query: Dict[str, bool]):
@@ -287,165 +274,153 @@ class BNReasoner:
 
         return cpt
 
-    def d_separation_with_pruning(self, X, Z, Y):
-        # copy the graph 
+    def d_separation_with_pruning(self, X: List[str], Z: List[str], Y: List[str]):
+        # Copy the graph
         P = deepcopy(self)
 
-        # delete leaf nodes
-        deletion = True
-
-        while deletion == True:
+        # Delete leaf nodes
+        while True:
+            V = set(P.bn.get_all_variables())
             count = 0
-            V = P.bn.get_all_variables()
-            for i in range(len(V)):
-                if V[i] not in X and V[i] not in Y and V[i] not in Z:
-                    if len(P.bn.get_children(V[i])) == 0:
-                            P.bn.del_var(V[i])
-                            count += 1
-           # print('after deleting leaf nodes: '+ str(P.bn.get_all_variables()))
-            if count == 0:
-                deletion = False
 
-        # delete outgoing edges from Z
+            for v in V - set(X + Y + Z):
+                if len(P.bn.get_children(v)) == 0:
+                    P.bn.del_var(v)
+                    count += 1
+
+            if count == 0:
+                break
+
+        # Delete outgoing edges from Z
         for var in Z:
             childs = P.bn.get_children(var)
+
             for child in childs:
-                P.bn.del_edge([var, child])
+                P.bn.del_edge((var, child))
 
-        #check for every node in X and Y if there is a connection (connection = )
-        # if so, X and Y are not d-separated by Z
+        # Check for every node in X and Y if there is a connection if so, X and Y are not d-separated by Z
+        for x, y in product(X, Y):
+            if nx.has_path(nx.to_undirected(P.bn.structure), x, y):
+                return False
 
-        for x in X:
-            for y in Y:
-               if nx.has_path(nx.to_undirected(P.bn.structure), x,y):
-                    return False
         return True
-    
-    ## TO DO: MAP and MPE estimation
 
     def map_mpe_estimation(
-        self, 
-        E: pd.Series,
-        Q: Optional[List[str]] = None,
-        heuristic: Optional[str] = "mindeg"
+        self, E: pd.Series, Q: Optional[List[str]] = None, heuristic: str = "mindeg"
     ) -> pd.DataFrame:
 
-        ## get all interesting variables:
+        # Get all interesting variables:
         bn = deepcopy(self)
         vars = bn.bn.get_all_variables()
-        E_vars = []
-        for i in range(0, len(E.index)):
-                E_vars.append(E.index[i])
+        E_vars = set(E.index)
 
         # MAP?
-        MAP = True
+        MAP = bool(Q)
 
-        # in case of MPE, Q = all variables not in E (for pruning)
-        if not (Q):
-            MAP = False
-            Q = []
-            for var in vars:
-                if var not in E_vars:
-                    Q.append(var)
+        # In case of MPE, Q = all variables not in E (for pruning)
+        if not MAP:
+            Q = list(set(vars - E_vars))
 
-        # 1. prune the network as far as possible
+        # 1. Prune the network as far as possible
         bn.pruning(Q, E)
 
-        # 2. get order of elimination
-        order = bn.order(heuristic = heuristic)
+        # 2. Get order of elimination
+        order = bn.order(heuristic=heuristic)
 
-        # 3. in case of MAP:
+        # 3. In case of MAP:
         # Multiply the factors and sum-out the variables not in Q and E, that exist after pruning
-
         CPT = bn.bn.get_all_cpts()
 
         if MAP:
             vars = bn.bn.get_all_variables()
-            SumOut_Vars = []
-            for var in vars:
-                if var not in Q:
-                    SumOut_Vars.append(var)
+            SumOut_Vars = set(vars) - set(Q)
 
+            # We often use sets to decrease necessary looping
+            # but here ordering is important so we can't
             for node in order:
                 if node in SumOut_Vars:
-                    # get the new factor
+                    # Get the new factor
                     used_cpts, newcpt, cols = self.multiplication_factors(CPT, node, E)
-                    
-                    # sum var out
-                    newcpt = newcpt.groupby(list(cols - {node}))["p"].sum().reset_index()
 
-                    # update + replace other factors
-                    CPT[node] = newcpt #not referring to the name, thus this works
+                    # Sum var out if any
+                    sum_cols = list(cols - {node})
+                    if sum_cols:
+                        newcpt = newcpt.groupby(sum_cols)["p"].sum().reset_index()
+
+                    # Update + replace other factors
+                    CPT[node] = newcpt  # not referring to the name, thus this works
                     for var in used_cpts:
                         if var != node:
                             del CPT[var]
 
-            # update order
-            order = list(set(order) - set(SumOut_Vars))
+            # Update order
+            order = list(set(order) - SumOut_Vars)
 
         # 4. maximise out
-        
-        for node in order:      
-            # get new factor, all used cpts and the col names
+        for node in order:
+            # Get new factor, all used cpts and the col names
             used_cpts, newcpt, cols = self.multiplication_factors(CPT, node, E)
-            # maximise out
+            # Maximise out
             newcpt = self.maximise_out(newcpt, cols, node)
-            # maybe evidenz is already clear?
+
+            # Maybe evidenz is already clear?
             if len(np.unique(newcpt[node].values)) == 1:
                 if node not in E.index:
                     E = E.append(pd.Series(newcpt.iloc[0][node], {node}))
-            # update + replace other factors
-            CPT[node] = newcpt #not referring to the name, thus this works
+
+            # Update + replace other factors
+            CPT[node] = newcpt  # not referring to the name, thus this works
             for var in used_cpts:
                 if var != node:
                     del CPT[var]
 
-        ## build the result        
+        # Build the result
         result = self.build_result(CPT)
 
         return result
-                
+
     @staticmethod
     def build_result(CPT: Dict[str, pd.DataFrame]) -> pd.DataFrame:
-        # result: maybe there is more than one instantiation :/
-        max = 1
-        for cpt in CPT:
-            max *= CPT[cpt].shape[0]
-        
-        # make all single independent cpts containing as many rows as max
-        for cpt in CPT:
-            newcpt = CPT[cpt]
-            while newcpt.shape[0] < max:
-                newcpt = newcpt.append(CPT[cpt], ignore_index=True)
-            CPT[cpt] = newcpt
-        
+        # Result: maybe there is more than one instantiation
+        vmax = reduce(mul, [cpt.shape[0] for cpt in CPT.values()], 1)
+
+        # Make all single independent cpts containing as many rows as max
+        for var, cpt in CPT.items():
+            newcpt = cpt
+
+            while newcpt.shape[0] < vmax:
+                newcpt = newcpt.append(cpt, ignore_index=True)
+
+            CPT[var] = newcpt
+
         data = {}
         p = []
-        for cpt in CPT:
-            for col in CPT[cpt].columns:
+
+        for cpt in CPT.values():
+            for col in cpt.columns:
                 if col == "p":
-                    p.append(list(CPT[cpt][col].values))
+                    p.append(list(cpt[col].values))
+
                 else:
-                    data[col] = CPT[cpt][col]
-            
+                    data[col] = cpt[col]
+
         p = np.asmatrix(p)
-        p = np.prod(p, axis = 0)
+        p = np.prod(p, axis=0)
         p = p.tolist()
         p = [item for sublist in p for item in sublist]
 
         result = pd.DataFrame(data)
         result["p"] = p
-        
-        result = result.query("p == p.max()").reset_index(drop = True)
+
+        result = result.query("p == p.max()").reset_index(drop=True)
 
         return result
 
     @staticmethod
-    def multiplication_factors(CPT: Dict[str, pd.DataFrame], 
-    node: str, E: pd.Series):
+    def multiplication_factors(CPT: Dict[str, pd.DataFrame], node: str, E: pd.Series):
 
-        # select all cpts that are used and set the col names
-        used_cpts = {}          
+        # Select all cpts that are used and set the col names
+        used_cpts = {}
         cols = {node}
 
         for cpt in CPT:
@@ -454,43 +429,48 @@ class BNReasoner:
                 used_cpts[cpt] = CPT[cpt]
                 cols = cols.union(cpt_cols)
 
-        # create newcpt for the faktor. Shorten it already as far as possible/needed
-        newcpt = pd.DataFrame(list(product([False, True], repeat=len(cols))),columns=cols)
-        newcpt["p"] = float(1)
+        # Create newcpt for the faktor. Shorten it already as far as possible/needed
+        newcpt = pd.DataFrame(product([False, True], repeat=len(cols)), columns=cols)
+        newcpt["p"] = 1.0
         newcpt = BayesNet.get_compatible_instantiations_table(E, newcpt)
         newcpt = newcpt.reset_index(drop=True)
         newcpt["valid"] = True
 
-        # multiply all faktors + check if rows are still needed
+        # Multiply all faktors + check if rows are still needed
         for i in range(newcpt.shape[0]):
-            row = pd.Series(newcpt.iloc[i][:-2], cols) # as instantiation
-            for cpt in used_cpts:
-                p = BayesNet.get_compatible_instantiations_table(row, used_cpts[cpt])["p"]
+            row = pd.Series(newcpt.iloc[i][:-2], cols)  # as instantiation
+
+            for cpt in used_cpts.values():
+                p = BayesNet.get_compatible_instantiations_table(row, cpt)["p"]
+
                 if len(p) == 0:
                     newcpt.at[i, "valid"] = False
                     break
-                else:
-                    p = p.values[0]
-                    newcpt.at[i, "p"] *= p
-            
-        newcpt = newcpt.loc[newcpt["valid"] == True].reset_index(drop = True)
+
+                p = p.values[0]
+                newcpt.at[i, "p"] *= p
+
+        newcpt = newcpt.loc[newcpt["valid"]].reset_index(drop=True)
         del newcpt["valid"]
-        
+
         return used_cpts, newcpt, cols
 
     @staticmethod
     def maximise_out(newcpt: pd.DataFrame, cols: Set[str], node: str) -> pd.DataFrame:
 
-        # max out and get all maxima
+        # Max out and get all maxima
         if len(cols) > 1:
             maxcpt = newcpt.groupby(list(cols - {node}))["p"].max().reset_index()
             fillcpt = []
+
             for i in range(maxcpt.shape[0]):
-                inst = (pd.Series(maxcpt.iloc[i], maxcpt.columns)) # as instantiation
+                inst = pd.Series(maxcpt.iloc[i], maxcpt.columns)  # as instantiation
                 row = BayesNet.get_compatible_instantiations_table(inst, newcpt)
                 fillcpt.append(row)
+
             newcpt = pd.concat(fillcpt, ignore_index=True)
+
         else:
-            newcpt = newcpt.query("p == p.max()").reset_index(drop = True)
+            newcpt = newcpt.query("p == p.max()").reset_index(drop=True)
 
         return newcpt
