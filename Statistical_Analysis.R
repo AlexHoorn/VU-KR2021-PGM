@@ -5,10 +5,6 @@
 ## Plots and Statistical Analysis of Experiments 
 ##
 ##
-## Input: all *.csv and *.txt files in Experiments
-## Output:
-##
-##
 ## last mod: 20.12.21
 
 # working directory
@@ -18,7 +14,7 @@
 
 ####### Input Data #################
 
-f.names <- dir(pattern = ".csv")
+# f.names <- dir(pattern = ".csv")
 
 
 
@@ -36,15 +32,18 @@ dat$experiment <- factor(dat$experiment)
 heu <- levels(dat$experiment)
 cols <- c("darkgreen", "darkred", "darkblue")
 
+# 5 to 505 in steps of 10, each time 10 times each
+# xtabs(~ experiment, dat) 510 in total for each heuristic
+
 ## analysis:
 
 # ancova:
 m1 <- lm(log(runtime) ~ nodes, data = dat)
-summary(m1)
+#summary(m1)
 m2 <- lm(log(runtime) ~ nodes + experiment, data = dat)
-summary(m2)
+#summary(m2)
 m3 <- lm(log(runtime) ~ nodes*experiment, data = dat)
-summary(m3)
+#summary(m3)
 
 anova(m1,m2,m3)
 
@@ -88,18 +87,51 @@ dat <- read.table("map_mpe_results.csv", header = TRUE, dec = ".", sep = ",")
 dat$task <- factor(substr(dat$experiment, 0, 3))
 dat$heu <- factor(substr(dat$experiment, 5, 13))
 
-table(dat$task)
-table(dat$heu)
-
-xtabs(~ task + heu, dat)
-#               heu
-# task  mindeg minfill random
-# map     50      50     50
-# mpe     37      35     35
-
 task <- levels(dat$task)
 heu <- levels(dat$heu)
 cols <- c("darkgreen", "darkred", "darkblue")
+
+
+# some descriptive data:
+
+#table(dat$task)
+# map  mpe 
+# 1920  672 
+
+### Timeouts in MAP
+
+# from 2 to 66 -> 65 group, each 10 times
+# MAP: in total 660
+# random: 645 (5) -> 650
+# minfill: 644 (6) -> 650
+# mindeg: 631 (19) -> 650
+
+
+### Timeouts in MPE
+
+# from 2 to 31 --> 30, each 10 times
+# # MPE: in total 155
+# random: 225 (75) -> 300
+# mindeg: 226 (74) -> 300
+# minfill: 221 (79) -> 300
+
+
+
+
+
+# how did we come to this number? (MAP and MPE)
+
+# too generate more realistic networks, they were adjusted in advance
+# for instance, there are no unconnected nodes
+
+
+#xtabs(~ task + heu, dat)
+#                heu
+# task  mindeg minfill random
+# map    631     644    645
+# mpe    226     221    225
+
+
 
 
 ### MAP
