@@ -14,7 +14,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 
 
 def main():
-    n_nodes = list(range(5, 30, 5)) * 10
+    n_nodes = list(range(2, 66, 1)) * 10
     tasks = [random_task(n, 2) for n in n_nodes]
     # Randomize order so not all big networks are executed at the same time
     random.shuffle(tasks)
@@ -27,13 +27,13 @@ def main():
     #     tasks = load(f)
 
     # MPEs
-    run_experiment(experiment_mpe_random, tasks)
-    run_experiment(experiment_mpe_mindeg, tasks)
-    run_experiment(experiment_mpe_minfill, tasks)
+    run_experiment(experiment_mpe_random, tasks, n_threads=4)
+    run_experiment(experiment_mpe_mindeg, tasks, n_threads=4)
+    run_experiment(experiment_mpe_minfill, tasks, n_threads=4)
     # MAPs
-    run_experiment(experiment_map_random, tasks)
-    run_experiment(experiment_map_mindeg, tasks)
-    run_experiment(experiment_map_minfill, tasks)
+    run_experiment(experiment_map_random, tasks, n_threads=4)
+    run_experiment(experiment_map_mindeg, tasks, n_threads=4)
+    run_experiment(experiment_map_minfill, tasks, n_threads=4)
 
 
 def experiment_map_random(
