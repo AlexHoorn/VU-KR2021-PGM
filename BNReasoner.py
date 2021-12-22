@@ -235,6 +235,7 @@ class BNReasoner:
 
         # Apply tidy sorting
         cpt = cpt.sort_values(list(cpt.columns), ascending=False)
+        cpt = cpt.reset_index(drop=True)
 
         return cpt
 
@@ -274,7 +275,7 @@ class BNReasoner:
 
         return cpt
 
-    def d_separation_with_pruning(self, X: List[str], Z: List[str], Y: List[str]):
+    def d_separation(self, X: List[str], Z: List[str], Y: List[str]):
         # Copy the graph
         P = deepcopy(self)
 
@@ -306,23 +307,25 @@ class BNReasoner:
         return True
 
     def map_mpe_estimation(
-        self, E: pd.Series, Q: Optional[List[str]] = None, heuristic: str = "mindeg"
+        self, E: pd.Series, Q: Optional[List[str]] = [], heuristic: str = "mindeg"
     ) -> pd.DataFrame:
 
         # Get all interesting variables:
         bn = deepcopy(self)
-        vars = bn.bn.get_all_variables()
+        vars = set(bn.bn.get_all_variables())
         E_vars = set(E.index)
 
         # MAP?
         MAP = bool(Q)
 
+        Q = set(Q)
+
         # In case of MPE, Q = all variables not in E (for pruning)
         if not MAP:
-            Q = list(set(vars - E_vars))
+            Q = vars - E_vars
 
         # 1. Prune the network as far as possible
-        bn.pruning(Q, E)
+        bn.pruning(list(Q), E)
 
         # 2. Get order of elimination
         order = bn.order(heuristic=heuristic)
@@ -332,8 +335,8 @@ class BNReasoner:
         CPT = bn.bn.get_all_cpts()
 
         if MAP:
-            vars = bn.bn.get_all_variables()
-            SumOut_Vars = set(vars) - set(Q)
+            vars = set(bn.bn.get_all_variables())
+            SumOut_Vars = vars - Q
 
             # We often use sets to decrease necessary looping
             # but here ordering is important so we can't
