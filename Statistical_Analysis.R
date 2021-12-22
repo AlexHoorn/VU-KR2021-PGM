@@ -101,7 +101,7 @@ cols <- c("darkgreen", "darkred", "darkblue")
 ### Timeouts in MAP
 
 # from 2 to 66 -> 65 group, each 10 times
-# MAP: in total 660
+# MAP: in total 1950
 # random: 645 (5) -> 650
 # minfill: 644 (6) -> 650
 # mindeg: 631 (19) -> 650
@@ -110,7 +110,7 @@ cols <- c("darkgreen", "darkred", "darkblue")
 ### Timeouts in MPE
 
 # from 2 to 31 --> 30, each 10 times
-# # MPE: in total 155
+# # MPE: in total 900
 # random: 225 (75) -> 300
 # mindeg: 226 (74) -> 300
 # minfill: 221 (79) -> 300
