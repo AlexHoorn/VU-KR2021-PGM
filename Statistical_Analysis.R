@@ -40,12 +40,10 @@ cols <- c("darkgreen", "darkred", "darkblue")
 # ancova:
 m1 <- lm(log(runtime) ~ nodes, data = dat)
 #summary(m1)
-m2 <- lm(log(runtime) ~ nodes + experiment, data = dat)
+m2 <- lm(log(runtime) ~ nodes*experiment, data = dat)
 #summary(m2)
-m3 <- lm(log(runtime) ~ nodes*experiment, data = dat)
-#summary(m3)
 
-anova(m1,m2,m3)
+anova(m1,m2)
 
 # Ancova allows for different slopes, all three heuristics differ significantly (p < .001)
 # with respect to slope and intercept
@@ -53,7 +51,7 @@ anova(m1,m2,m3)
 # increase quadratic / exponentially.
 
 
-lm_coef <- coef(m3)
+lm_coef <- coef(m2)
 
 ## plot
 pdf("plots/heuristics.pdf", width = 10, height = 6, pointsize = 10)
@@ -105,6 +103,8 @@ cols <- c("darkgreen", "darkred", "darkblue")
 # random: 645 (5) -> 650
 # minfill: 644 (6) -> 650
 # mindeg: 631 (19) -> 650
+## starting with 61 nodes, everything was timeout
+
 
 
 ### Timeouts in MPE
@@ -114,12 +114,8 @@ cols <- c("darkgreen", "darkred", "darkblue")
 # random: 225 (75) -> 300
 # mindeg: 226 (74) -> 300
 # minfill: 221 (79) -> 300
+## starting with 23 nodes, everything was timeout
 
-
-
-
-
-# how did we come to this number? (MAP and MPE)
 
 # too generate more realistic networks, they were adjusted in advance
 # for instance, there are no unconnected nodes
@@ -140,37 +136,30 @@ cols <- c("darkgreen", "darkred", "darkblue")
 ## analysis
 m1 <- lm(log(runtime) ~ nodes, dat = dat[dat$task == task[1],])
 # summary(m1)
-m2 <- lm(log(runtime) ~ nodes + heu, dat = dat[dat$task == task[1],])
+m2 <- lm(log(runtime) ~ nodes * heu, dat = dat[dat$task == task[1],])
 # summary(m2)
-m3 <- lm(log(runtime) ~ nodes * heu, dat = dat[dat$task == task[1],])
-# summary(m3)
 
-anova(m1,m2,m3)
-# Whereas the first model shows a significant impact of the network size on the runtime
-# (t(1) = 7.72, p < .001), neither a model that allows for an additional effect of the heuristics
-# (F(2,146) = 0.47, p = .625) nor a model that allows for an additional effect and an 
-# interaction of the heuristic with the slope (F(2, 144) = 0.27, p = 0.766) can explain 
-# significantly more variance. 
+anova(m1,m2)
 
 
-lm_coef <- coef(m3)
+lm_coef <- coef(m2)
 
 ## plots for MAP und MPE, splitted?
 ## plot
 pdf("plots/MAP.pdf", width = 10, height = 6, pointsize = 10)
 par(mgp = c(2.5, 0.7, 0), mar = c(4, 4, 1, 1) + 0.1)
 plot(runtime ~ jitter(nodes), data = dat[dat$task == task[1] & dat$heu == heu[1],], type = "p", col = cols[1],
-     ylab = "Runtime (sec)", xlab = "Network size", ylim = c(0,10), xlim = c(0,45))
+     ylab = "Runtime (sec)", xlab = "Network size", ylim = c(0,40), xlim = c(0,60))
 abline(h = 0, col = "grey", lty = "dotdash")
-segments(0, -10, 0, 8.5, lty = "dotdash", col = "grey")
+segments(0, -10, 0, 35, lty = "dotdash", col = "grey")
 points(runtime ~ jitter(nodes), data = dat[dat$task == task[1] & dat$heu == heu[2],], type = "p", col = cols[2])
 points(runtime ~ jitter(nodes), data = dat[dat$task == task[1] & dat$heu == heu[3],], type = "p", col = cols[3])
 #abline(lm(runtime ~ nodes, data = dat[dat$task == task[1] & dat$heu == heu[1],]), col = cols[1])
 #abline(lm(runtime ~ nodes, data = dat[dat$task == task[1] & dat$heu == heu[2],]), col = cols[2])
 #abline(lm(runtime ~ nodes, data = dat[dat$task == task[1] & dat$heu == heu[3],]), col = cols[3])
-lines(c(0:50), exp(lm_coef[1])*exp(lm_coef[2]*c(0:50)), col = cols[1])
-lines(c(0:50), exp(lm_coef[1] + lm_coef[3])*exp((lm_coef[2] + lm_coef[5])*c(0:50)), col = cols[2])
-lines(c(0:50), exp(lm_coef[1] + lm_coef[4])*exp((lm_coef[2] + lm_coef[6])*c(0:50)), col = cols[3])
+lines(c(0:70), exp(lm_coef[1])*exp(lm_coef[2]*c(0:70)), col = cols[1])
+lines(c(0:70), exp(lm_coef[1] + lm_coef[3])*exp((lm_coef[2] + lm_coef[5])*c(0:70)), col = cols[2])
+lines(c(0:70), exp(lm_coef[1] + lm_coef[4])*exp((lm_coef[2] + lm_coef[6])*c(0:70)), col = cols[3])
 legend("topleft", legend = heu, col = cols, 
        lty = 1, cex=1, lwd = 2, box.col = "white")
 box()
@@ -184,28 +173,21 @@ dev.off()
 ## analysis
 m1 <- lm(log(runtime) ~ nodes, dat = dat[dat$task == task[2],])
 # summary(m1)
-m2 <- lm(log(runtime) ~ nodes + heu, dat = dat[dat$task == task[2],])
+m2 <- lm(log(runtime) ~ nodes * heu, dat = dat[dat$task == task[2],])
 # summary(m2)
-m3 <- lm(log(runtime) ~ nodes * heu, dat = dat[dat$task == task[2],])
-# summary(m3)
 
-anova(m1,m2,m3)
-# Whereas the first model shows a significant impact of the network size on the runtime
-# (t(1) = 7.72, p < .001), neither a model that allows for an additional effect of the heuristics
-# (F(2,146) = 0.47, p = .625) nor a model that allows for an additional effect and an 
-# interaction of the heuristic with the slope (F(2, 144) = 0.27, p = 0.766) can explain 
-# significantly more variance. 
+anova(m1,m2)
 
-lm_coef <- coef(m3)
+lm_coef <- coef(m2)
 
 
 ## plot
 pdf("plots/MPE.pdf", width = 10, height = 6, pointsize = 10)
 par(mgp = c(2.5, 0.7, 0), mar = c(4, 4, 1, 1) + 0.1)
 plot(runtime ~ jitter(nodes), data = dat[dat$task == task[2] & dat$heu == heu[1],], type = "p", col = cols[1],
-     ylab = "Runtime (sec)", xlab = "Network size", ylim = c(0,120), xlim = c(0, 25))
+     ylab = "Runtime (sec)", xlab = "Network size", ylim = c(0,120), xlim = c(0, 22))
 abline(h = 0, col = "grey", lty = "dotdash")
-segments(0, -100, 0, 100, lty = "dotdash", col = "grey")
+segments(0, -100, 0, 105, lty = "dotdash", col = "grey")
 points(runtime ~ jitter(nodes), data = dat[dat$task == task[2] & dat$heu == heu[2],], type = "p", col = cols[2])
 points(runtime ~ jitter(nodes), data = dat[dat$task == task[2] & dat$heu == heu[3],], type = "p", col = cols[3])
 lines(c(0:30), exp(lm_coef[1])*exp(lm_coef[2]*c(0:30)), col = cols[1])
@@ -226,24 +208,22 @@ dev.off()
 ## analysis
 m1 <- lm(log(runtime) ~ nodes, dat = dat)
 # summary(m1)
-m2 <- lm(log(runtime) ~ nodes + task, dat = dat)
+m2 <- lm(log(runtime) ~ nodes * task, dat = dat)
 # summary(m2)
-m3 <- lm(log(runtime) ~ nodes * task, dat = dat)
-# summary(m3)
 
-anova(m1,m2,m3)
+anova(m1,m2)
 
-lm_coef <- coef(m3)
+lm_coef <- coef(m2)
 
 pdf("plots/MAP_MPE.pdf", width = 10, height = 6, pointsize = 10)
 par(mgp = c(2.5, 0.7, 0), mar = c(4, 4, 1, 1) + 0.1)
 plot(runtime ~ jitter(nodes), data = dat[dat$task == task[1],], type = "p", col = cols[1],
-     ylab = "Runtime (sec)", xlab = "Network size", ylim = c(0,115), xlim = c(0, 25))
+     ylab = "Runtime (sec)", xlab = "Network size", ylim = c(0,120), xlim = c(0, 60))
 abline(h = 0, col = "grey", lty = "dotdash")
-segments(0, -100, 0, 100, lty = "dotdash", col = "grey")
+segments(0, -100, 0, 110, lty = "dotdash", col = "grey")
 points(runtime ~ jitter(nodes), data = dat[dat$task == task[2],], type = "p", col = cols[2])
-lines(c(0:30), exp(lm_coef[1])*exp(lm_coef[2]*c(0:30)), col = cols[1])
-lines(c(0:30), exp(lm_coef[1] + lm_coef[3])*exp((lm_coef[2] + lm_coef[4])*c(0:30)), col = cols[2])
+lines(c(0:60), exp(lm_coef[1])*exp(lm_coef[2]*c(0:60)), col = cols[1])
+lines(c(0:60), exp(lm_coef[1] + lm_coef[3])*exp((lm_coef[2] + lm_coef[4])*c(0:60)), col = cols[2])
 legend("topleft", legend = task, col = cols, 
        cex=1, lwd = 2, box.col = "white")
 box()
@@ -259,4 +239,11 @@ dev.off()
 
 m1 <- lm(log(runtime) ~ nodes * task + roots + leaves + mean_edges, dat = dat)
 summary(m1)
+
+
+
+
+
+
+
 
